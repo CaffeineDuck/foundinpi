@@ -1066,6 +1066,7 @@ export default function ExcavationApp() {
                     max="100"
                     value={slider}
                     disabled={!result}
+                    style={{ ["--fill" as string]: `${slider}%` } as React.CSSProperties}
                     onChange={(event) =>
                       setSlider(Number(event.currentTarget.value))
                     }

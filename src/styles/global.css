@@ -786,7 +786,8 @@ p {
   pointer-events: none;
 }
 
-[data-theme="lab"] .stage-fx {
+[data-theme="lab"] .stage-fx,
+[data-theme="console"] .stage-fx {
   background: repeating-linear-gradient(0deg, rgb(0 0 0 / 0.14) 0 1px, transparent 1px 3px);
   mix-blend-mode: multiply;
 }
@@ -813,6 +814,10 @@ p {
   background: var(--accent);
   box-shadow: var(--glow);
   pointer-events: none;
+}
+
+.stage[data-state="ready"] {
+  cursor: crosshair;
 }
 
 .stage-badges {
@@ -1137,6 +1142,53 @@ p {
 .range-tool input {
   width: 100%;
   accent-color: var(--accent);
+  height: 20px;
+  background: transparent;
+  cursor: ew-resize;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.range-tool input::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0%,
+    var(--accent) var(--fill, 0%),
+    var(--line-strong) var(--fill, 0%)
+  );
+}
+
+.range-tool input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -7px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  background: var(--surface);
+  box-shadow: var(--glow-soft);
+  transition: transform 0.14s ease, box-shadow 0.2s ease;
+}
+
+.range-tool input:hover::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+
+.range-tool input:active::-webkit-slider-thumb {
+  transform: scale(1.24);
+  box-shadow: var(--glow);
+}
+
+.range-tool input::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  background: var(--surface);
+  box-shadow: var(--glow-soft);
 }
 
 .icon-button {
@@ -1376,6 +1428,7 @@ p {
 }
 
 .rarity-badge {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -1390,6 +1443,26 @@ p {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   white-space: nowrap;
+  overflow: hidden;
+}
+
+/* one-time sheen sweep when the relic lands */
+.rarity-badge::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    color-mix(in srgb, var(--gold) 55%, white) 50%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  animation: sheen 1.1s ease 0.4s 1;
+}
+
+@keyframes sheen {
+  to { transform: translateX(120%); }
 }
 
 /* breakdown bars */
@@ -2179,6 +2252,11 @@ p {
 @keyframes grow {
   from { transform: scaleX(0); }
   to { transform: scaleX(1); }
+}
+
+@keyframes pop {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
 }
 
 @keyframes drift {
