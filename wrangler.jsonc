@@ -1,0 +1,40 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "foundinpi",
+  "main": "@astrojs/cloudflare/entrypoints/server",
+  "compatibility_date": "2026-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "account_id": "c11a31e2d7b0b18604ed2a40e0b1745a",
+  "workers_dev": true,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "foundinpi.com",
+      "custom_domain": true
+    },
+    {
+      "pattern": "www.foundinpi.com",
+      "custom_domain": true
+    }
+  ],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "foundinpi",
+      "database_id": "replace-after-cf-d1-create"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "RELIC_BUCKET",
+      "bucket_name": "foundinpi-relics"
+    }
+  ]
+}

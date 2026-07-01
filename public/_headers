@@ -1,0 +1,7 @@
+/dig-sites/*
+  Cache-Control: public, max-age=31556952, immutable
+  X-Content-Type-Options: nosniff
+
+/og-default.png
+  Cache-Control: public, max-age=31556952, immutable
+  X-Content-Type-Options: nosniff

@@ -1,0 +1,119 @@
+---
+import "../styles/global.css";
+
+type Props = {
+  title: string;
+  description: string;
+  canonical?: string;
+  image?: string;
+  robots?: string;
+  jsonLd?: Record<string, unknown>;
+};
+
+const {
+  title,
+  description,
+  canonical = Astro.url.href,
+  image,
+  robots = "index,follow",
+  jsonLd
+} = Astro.props;
+const siteName = "Found in Pi";
+const ogImage = image ?? new URL("/og-default.png", Astro.url.origin).toString();
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script is:inline>
+      (function () {
+        try {
+          var t = localStorage.getItem("fip-theme");
+          if (t !== "lab" && t !== "bone" && t !== "cursed") t = "lab";
+          document.documentElement.dataset.theme = t;
+        } catch (e) {
+          document.documentElement.dataset.theme = "lab";
+        }
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800;900&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;700&family=Space+Mono:wght@400;700&family=VT323&display=swap"
+    />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="robots" content={robots} />
+    <link rel="canonical" href={canonical} />
+    <meta property="og:site_name" content={siteName} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+    <meta name="theme-color" content="#171814" />
+    {
+      jsonLd ? (
+        <script
+          is:inline
+          type="application/ld+json"
+          set:html={JSON.stringify(jsonLd)}
+        />
+      ) : null
+    }
+  </head>
+  <body>
+    <div class="page-atmosphere" aria-hidden="true"></div>
+    <slot />
+    <footer class="site-footer">
+      <span>Found in Pi</span>
+      <a href="https://github.com/caffeineduck/foundinpi" rel="noreferrer">
+        GitHub
+      </a>
+      <a href="https://x.com/caffe1neduck" rel="noreferrer">
+        Twitter @caffe1neduck
+      </a>
+    </footer>
+    <div class="version-switch" role="group" aria-label="Design version">
+      <span class="version-switch-label">π version</span>
+      <button type="button" data-theme-btn="lab">Lab</button>
+      <button type="button" data-theme-btn="bone">Bone</button>
+      <button type="button" data-theme-btn="cursed">Cursed</button>
+    </div>
+    <script is:inline>
+      (function () {
+        var root = document.documentElement;
+        var buttons = Array.prototype.slice.call(
+          document.querySelectorAll("[data-theme-btn]")
+        );
+        function sync() {
+          var current = root.dataset.theme;
+          buttons.forEach(function (button) {
+            button.setAttribute(
+              "aria-pressed",
+              String(button.dataset.themeBtn === current)
+            );
+          });
+        }
+        buttons.forEach(function (button) {
+          button.addEventListener("click", function () {
+            var next = button.dataset.themeBtn;
+            root.dataset.theme = next;
+            try {
+              localStorage.setItem("fip-theme", next);
+            } catch (e) {}
+            sync();
+          });
+        });
+        sync();
+      })();
+    </script>
+  </body>
+</html>

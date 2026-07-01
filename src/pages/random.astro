@@ -1,0 +1,33 @@
+---
+import { env } from "cloudflare:workers";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { getRandomRelic, type EnvLike } from "../lib/server/store";
+
+export const prerender = false;
+
+const relic = await getRandomRelic(env as EnvLike);
+
+if (relic) {
+  return Astro.redirect(`/r/${relic.id}`, 302);
+}
+
+const title = "Random Pi Relic - Found in Pi";
+const description =
+  "Open a random public image relic recovered from Found in Pi's finite pi dig site.";
+const canonical = new URL("/random", Astro.url.origin).toString();
+---
+
+<BaseLayout
+  title={title}
+  description={description}
+  canonical={canonical}
+  robots="noindex,follow"
+>
+  <main class="missing-shell">
+    <a href="/" class="wordmark">Found in Pi</a>
+    <h1>No relics to shuffle yet</h1>
+    <p>The random dig opens once someone publishes a public relic.</p>
+    <a class="primary-link" href="/">Excavate your image</a>
+  </main>
+</BaseLayout>
+

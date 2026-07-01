@@ -1,0 +1,44 @@
+{
+  "name": "found-in-pi",
+  "version": "0.1.0",
+  "description": "Excavate images from a finite indexed dig site in pi.",
+  "homepage": "https://foundinpi.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/caffeineduck/foundinpi.git"
+  },
+  "bugs": {
+    "url": "https://github.com/caffeineduck/foundinpi/issues"
+  },
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --host 0.0.0.0",
+    "build": "astro check && astro build",
+    "check": "astro check",
+    "preview": "astro preview",
+    "deploy": "astro build && node scripts/with-cloudflare-env.mjs wrangler deploy",
+    "deploy:ci": "astro build && wrangler d1 migrations apply foundinpi --remote && wrangler deploy",
+    "cf:d1:create": "node scripts/with-cloudflare-env.mjs wrangler d1 create foundinpi --binding DB --update-config",
+    "cf:d1:migrate:local": "node scripts/with-cloudflare-env.mjs wrangler d1 migrations apply foundinpi --local",
+    "cf:d1:migrate:remote": "node scripts/with-cloudflare-env.mjs wrangler d1 migrations apply foundinpi --remote",
+    "cf:r2:create": "node scripts/with-cloudflare-env.mjs wrangler r2 bucket create foundinpi-relics",
+    "digsite:build": "node scripts/build-dig-site-index.mjs 1000000"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^14.1.0",
+    "@astrojs/react": "^6.0.0",
+    "astro": "^7.0.5",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.9",
+    "@cloudflare/workers-types": "^4.20260701.1",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.0",
+    "wrangler": "^4.106.0"
+  }
+}

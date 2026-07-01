@@ -1,0 +1,15 @@
+---
+import ExcavationApp from "../components/ExcavationApp";
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+const title = "Found in Pi - Excavate Your Image From Digits of Pi";
+const description =
+  "Upload an image and recover a shareable pi relic with a reconstruction, heatmap, rarity score, and finite dig-site report.";
+---
+
+<BaseLayout title={title} description={description} canonical={Astro.url.origin + "/"}>
+  <main class="home-shell">
+    <ExcavationApp client:load />
+  </main>
+</BaseLayout>
+
