@@ -2355,19 +2355,7 @@ p {
   }
 
   .mode-seg {
-    grid-template-columns: repeat(3, 1fr);
-  }
-
-  .mode-seg button:nth-child(3) {
-    border-right: 0;
-  }
-
-  .mode-seg button:nth-child(n + 4) {
-    border-top: 1px solid var(--line);
-  }
-
-  .mode-seg button em {
-    display: none;
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .stage-tool-row {
