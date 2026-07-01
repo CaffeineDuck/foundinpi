@@ -2,10 +2,12 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import { env } from "cloudflare:workers";
 import { listRelics, publicArtifactUrl, type EnvLike } from "../lib/server/store";
+import { MODES } from "../lib/excavation/constants";
 
 export const prerender = false;
 
 const relics = await listRelics(env as EnvLike, 36);
+const totalViews = relics.reduce((sum, relic) => sum + relic.views, 0);
 const title = "Pi Relic Museum - Public Excavations From Found in Pi";
 const description =
   "Browse public image relics recovered from a finite indexed pi dig site, ranked by views and excavation score.";
@@ -23,9 +25,15 @@ const jsonLd = {
   <main class="museum-shell">
     <header class="museum-header">
       <a href="/" class="wordmark">Found in Pi</a>
-      <div>
+      <div class="museum-title">
         <p class="eyebrow">Pi Relic Museum</p>
         <h1>Public excavations</h1>
+        {relics.length > 0 ? (
+          <p class="museum-count">
+            {relics.length} artifacts cataloged · {totalViews.toLocaleString()}{" "}
+            visits · Dig Site I
+          </p>
+        ) : null}
       </div>
       <div class="header-links">
         <a class="primary-link secondary" href="/random">Random relic</a>
@@ -38,19 +46,25 @@ const jsonLd = {
         <section class="relic-grid" aria-label="Public relics">
           {relics.map((relic) => (
             <a class="relic-card" href={`/r/${relic.id}`}>
-              <img
-                src={publicArtifactUrl(relic.artifactKey)}
-                alt={`${relic.title} pi relic`}
-                loading="lazy"
-                width="480"
-                height="360"
-              />
+              <div class="relic-card-plate">
+                <span class="relic-card-no">FIP-{relic.id}</span>
+                <span class="relic-card-tag">{relic.rarity}</span>
+                <img
+                  src={publicArtifactUrl(relic.artifactKey)}
+                  alt={`${relic.title} pi relic`}
+                  loading="lazy"
+                  width="480"
+                  height="360"
+                />
+              </div>
               <span class="relic-card-body">
                 <strong>{relic.title}</strong>
-                <span>
-                  {relic.piNative.toFixed(1)}% pi-native · {relic.rarity}
+                <span class="relic-card-stat">
+                  <b>{relic.piNative.toFixed(1)}%</b> pi-native
                 </span>
-                <small>{relic.views} views</small>
+                <small>
+                  {MODES[relic.mode].label} · {relic.views.toLocaleString()} views
+                </small>
               </span>
             </a>
           ))}

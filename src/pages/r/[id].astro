@@ -1,7 +1,13 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { env } from "cloudflare:workers";
-import { getRelic, publicArtifactUrl, type EnvLike } from "../../lib/server/store";
+import {
+  getRelic,
+  listRelics,
+  publicArtifactUrl,
+  type EnvLike
+} from "../../lib/server/store";
+import { MODES } from "../../lib/excavation/constants";
 
 export const prerender = false;
 
@@ -12,6 +18,36 @@ const relic = Astro.params.id
 if (!relic) {
   Astro.response.status = 404;
 }
+
+const gallery = relic ? await listRelics(env as EnvLike, 72) : [];
+const galleryIndex = relic
+  ? gallery.findIndex((entry) => entry.id === relic.id)
+  : -1;
+const prevRelic = galleryIndex > 0 ? gallery[galleryIndex - 1] : null;
+const nextRelic =
+  galleryIndex >= 0 && galleryIndex < gallery.length - 1
+    ? gallery[galleryIndex + 1]
+    : null;
+const prevUrl = prevRelic ? `/r/${prevRelic.id}` : null;
+const nextUrl = nextRelic ? `/r/${nextRelic.id}` : null;
+const more = relic
+  ? gallery.filter((entry) => entry.id !== relic.id).slice(0, 4)
+  : [];
+
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December"
+];
 
 const canonical = relic
   ? new URL(`/r/${relic.id}`, Astro.url.origin).toString()
@@ -28,7 +64,25 @@ const artifactUrl = relic
 const cardUrl = relic
   ? new URL(publicArtifactUrl(relic.cardKey), Astro.url.origin).toString()
   : undefined;
-const robots = relic && relic.status !== "hidden" ? "index,follow" : "noindex,nofollow";
+const robots =
+  relic && relic.status !== "hidden" ? "index,follow" : "noindex,nofollow";
+
+const modeLabel = relic ? MODES[relic.mode].label : "";
+const digShort = relic ? relic.digSite.split(":")[0] : "";
+const createdDate = relic ? new Date(relic.createdAt) : null;
+const catalogDate = createdDate
+  ? `${MONTHS[createdDate.getUTCMonth()]} ${createdDate.getUTCFullYear()}`
+  : "";
+const catalogNo = relic ? `FIP-${relic.id}` : "";
+const breakdown = relic
+  ? [
+      { k: "exact", label: "Exact Pi", pct: relic.exactPct },
+      { k: "near", label: "Near Pi", pct: relic.nearPct },
+      { k: "lossy", label: "Lossy Pi", pct: relic.lossyPct },
+      { k: "earth", label: "Earth Bytes", pct: relic.earthPct }
+    ]
+  : [];
+
 const jsonLd = relic
   ? {
       "@context": "https://schema.org",
@@ -65,44 +119,77 @@ const jsonLd = relic
           </div>
         </header>
 
-        <section class="result-hero">
-          <div class="result-image-wrap">
-            <img
-              src={artifactUrl}
-              alt={`${relic.title} reconstructed pi relic`}
-              width="960"
-              height="720"
-            />
-          </div>
-          <article class="result-report">
-            <p class="eyebrow">Recovered Artifact</p>
-            <h1>{relic.title}</h1>
-            <p class="result-summary">{description}</p>
-            <div class="result-score">
-              <strong>{relic.piNative.toFixed(1)}%</strong>
-              <span>pi-native</span>
+        {prevRelic || nextRelic ? (
+          <nav class="relic-pager" aria-label="Relic navigation">
+            {prevRelic ? (
+              <a class="pager-link prev" href={`/r/${prevRelic.id}`}>
+                <span class="pager-arrow">←</span>
+                <span class="pager-meta">
+                  <em>Previous</em>
+                  <strong>{prevRelic.title}</strong>
+                </span>
+              </a>
+            ) : (
+              <span class="pager-spacer" />
+            )}
+            <a class="pager-random" href="/random">Random relic</a>
+            {nextRelic ? (
+              <a class="pager-link next" href={`/r/${nextRelic.id}`}>
+                <span class="pager-meta">
+                  <em>Next</em>
+                  <strong>{nextRelic.title}</strong>
+                </span>
+                <span class="pager-arrow">→</span>
+              </a>
+            ) : (
+              <span class="pager-spacer" />
+            )}
+          </nav>
+        ) : null}
+
+        <section class="artifact">
+          <div class="artifact-viewer">
+            <div class="stage artifact-stage" data-view="relic">
+              <div class="artifact-badges">
+                <span>{modeLabel}</span>
+                <span class="mono">{digShort}</span>
+              </div>
+              <img
+                class="artifact-img is-relic"
+                src={artifactUrl}
+                alt={`${relic.title} reconstructed pi relic`}
+                width="960"
+                height="720"
+              />
+              <img
+                class="artifact-img is-card"
+                src={cardUrl}
+                alt={`${relic.title} share card`}
+                width="1200"
+                height="630"
+                loading="lazy"
+              />
+              <div class="stage-fx" aria-hidden="true" />
+              <button class="zoom-btn" type="button" data-zoom aria-label="Zoom">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
+                Zoom
+              </button>
+              <div class="artifact-readout mono" aria-hidden="true">
+                <span>{catalogNo}</span>
+                <span>LONGEST FOSSIL {relic.longestFossil}B</span>
+                <span>{relic.views.toLocaleString()} VIEWS</span>
+              </div>
             </div>
-            <div class="result-rarity">{relic.rarity}</div>
-            <dl class="result-metrics">
-              <div>
-                <dt>Exact Pi</dt>
-                <dd>{relic.exactPct.toFixed(1)}%</dd>
-              </div>
-              <div>
-                <dt>Near Pi</dt>
-                <dd>{relic.nearPct.toFixed(1)}%</dd>
-              </div>
-              <div>
-                <dt>Lossy Pi</dt>
-                <dd>{relic.lossyPct.toFixed(1)}%</dd>
-              </div>
-              <div>
-                <dt>Earth Bytes</dt>
-                <dd>{relic.earthPct.toFixed(1)}%</dd>
-              </div>
-            </dl>
+
+            <div class="artifact-toggle" role="group" aria-label="View">
+              <button type="button" data-view-btn="relic" class="active">
+                Reconstruction
+              </button>
+              <button type="button" data-view-btn="card">Share card</button>
+            </div>
+
             <div class="map-block">
-              <span class="map-caption">Excavation map</span>
+              <span class="map-caption">Excavation map · where pi was found</span>
               <div
                 class="excavation-map"
                 role="img"
@@ -125,15 +212,173 @@ const jsonLd = relic
                 ))}
               </div>
             </div>
+          </div>
+
+          <article class="artifact-report">
+            <p class="eyebrow">Recovered Artifact · {catalogNo}</p>
+            <h1>{relic.title}</h1>
+
+            <div class="score-hero">
+              <div class="score-huge">
+                {relic.piNative.toFixed(1)}
+                <i>%</i>
+              </div>
+              <div class="score-meta">
+                <span class="score-label">pi-native</span>
+                <span class="rarity-badge">{relic.rarity}</span>
+              </div>
+            </div>
+
+            <div class="breakdown">
+              {breakdown.map((entry) => (
+                <div class="bar" data-k={entry.k}>
+                  <span class="bar-label">{entry.label}</span>
+                  <span class="bar-track">
+                    <span class="bar-fill" style={`width:${entry.pct}%`} />
+                  </span>
+                  <span class="bar-val">{entry.pct.toFixed(1)}%</span>
+                </div>
+              ))}
+            </div>
+
+            <dl class="placard">
+              <div>
+                <dt>Dig site</dt>
+                <dd>{digShort}</dd>
+              </div>
+              <div>
+                <dt>Restoration</dt>
+                <dd>{modeLabel}</dd>
+              </div>
+              <div>
+                <dt>Longest fossil</dt>
+                <dd>{relic.longestFossil} bytes</dd>
+              </div>
+              <div>
+                <dt>Cataloged</dt>
+                <dd>{catalogDate}</dd>
+              </div>
+            </dl>
+
+            <div class="artifact-actions">
+              <button type="button" class="share-primary" data-copy-link>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                <span data-copy-label>Copy link</span>
+              </button>
+              <a class="share-opt" href={cardUrl} download={`found-in-pi-${relic.id}.png`} title="Download the relic card" aria-label="Download the relic card">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+              </a>
+            </div>
+
             <p class="truth-note result-truth">
               Found in Pi searches a finite indexed region of pi. Scores are
               excavation scores, not compression claims.
             </p>
-            <a class="primary-link" href="/">Excavate your image</a>
+
+            <a class="primary-link" href="/">Excavate your own image</a>
           </article>
         </section>
 
-        <script is:inline define:vars={{ id: relic.id }}>
+        {more.length > 0 ? (
+          <section class="more">
+            <div class="more-head">
+              <h2>More from the museum</h2>
+              <a href="/museum">All excavations →</a>
+            </div>
+            <div class="relic-grid">
+              {more.map((entry) => (
+                <a class="relic-card" href={`/r/${entry.id}`}>
+                  <img
+                    src={publicArtifactUrl(entry.artifactKey)}
+                    alt={`${entry.title} pi relic`}
+                    loading="lazy"
+                    width="480"
+                    height="360"
+                  />
+                  <span class="relic-card-body">
+                    <strong>{entry.title}</strong>
+                    <span>
+                      {entry.piNative.toFixed(1)}% pi-native · {entry.rarity}
+                    </span>
+                    <small>{entry.views.toLocaleString()} views</small>
+                  </span>
+                </a>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        <div class="lightbox" data-lightbox hidden>
+          <img alt={`${relic.title} enlarged`} />
+        </div>
+
+        <script is:inline define:vars={{ id: relic.id, canonical, prevUrl, nextUrl }}>
+          // keyboard navigation between relics
+          document.addEventListener("keydown", (event) => {
+            if (event.target instanceof HTMLInputElement) return;
+            if (event.key === "ArrowLeft" && prevUrl) window.location.href = prevUrl;
+            if (event.key === "ArrowRight" && nextUrl) window.location.href = nextUrl;
+          });
+
+          // view / relic-card toggle
+          const stage = document.querySelector(".artifact-stage");
+          document.querySelectorAll("[data-view-btn]").forEach((button) => {
+            button.addEventListener("click", () => {
+              const view = button.getAttribute("data-view-btn");
+              stage?.setAttribute("data-view", view);
+              document
+                .querySelectorAll("[data-view-btn]")
+                .forEach((other) =>
+                  other.classList.toggle(
+                    "active",
+                    other === button
+                  )
+                );
+            });
+          });
+
+          // zoom lightbox
+          const lightbox = document.querySelector("[data-lightbox]");
+          const lightboxImg = lightbox?.querySelector("img");
+          function openZoom() {
+            const view = stage?.getAttribute("data-view");
+            const current = stage?.querySelector(
+              view === "card" ? ".is-card" : ".is-relic"
+            );
+            if (lightbox && lightboxImg && current) {
+              lightboxImg.src = current.getAttribute("src");
+              lightbox.hidden = false;
+              document.body.style.overflow = "hidden";
+            }
+          }
+          function closeZoom() {
+            if (lightbox) lightbox.hidden = true;
+            document.body.style.overflow = "";
+          }
+          document
+            .querySelector("[data-zoom]")
+            ?.addEventListener("click", openZoom);
+          lightbox?.addEventListener("click", closeZoom);
+          document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") closeZoom();
+          });
+
+          // copy link
+          const copyButton = document.querySelector("[data-copy-link]");
+          const copyLabel = document.querySelector("[data-copy-label]");
+          copyButton?.addEventListener("click", async () => {
+            try {
+              await navigator.clipboard.writeText(canonical);
+              if (copyLabel) {
+                copyLabel.textContent = "Link copied!";
+                setTimeout(() => (copyLabel.textContent = "Copy link"), 1800);
+              }
+            } catch {
+              if (copyLabel) copyLabel.textContent = "Copy failed";
+            }
+          });
+
+          // sampled view counting
           const sampleRate = 64;
           const repeatWindowMs = 6 * 60 * 60 * 1000;
           const storageKey = `found-in-pi:view:${id}`;
