@@ -378,6 +378,7 @@ export default function ExcavationApp() {
   const relicCanvas = useRef<HTMLCanvasElement | null>(null);
   const heatmapCanvas = useRef<HTMLCanvasElement | null>(null);
   const imageStage = useRef<HTMLDivElement | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const workerRef = useRef<Worker | null>(null);
   const lastFileRef = useRef<File | null>(null);
   const lastIsDemoRef = useRef(false);
@@ -1206,16 +1207,29 @@ export default function ExcavationApp() {
                   </div>
                 </div>
 
+                <input
+                  ref={uploadInputRef}
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={(event) => handleFileList(event.currentTarget.files)}
+                />
                 <div className="share">
                   <button
                     type="button"
                     className="share-primary"
-                    onClick={shareRelic}
-                    disabled={
-                      publishState.status === "publishing" || isDemoSpecimen
+                    onClick={() =>
+                      isDemoSpecimen
+                        ? uploadInputRef.current?.click()
+                        : void shareRelic()
                     }
+                    disabled={publishState.status === "publishing"}
                   >
-                    <Share2 size={17} aria-hidden="true" />
+                    {isDemoSpecimen ? (
+                      <ImagePlus size={17} aria-hidden="true" />
+                    ) : (
+                      <Share2 size={17} aria-hidden="true" />
+                    )}
                     {isDemoSpecimen
                       ? "Upload to share"
                       : publishState.status === "publishing"

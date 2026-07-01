@@ -101,7 +101,30 @@ const jsonLd = relic
                 <dd>{relic.earthPct.toFixed(1)}%</dd>
               </div>
             </dl>
-            <pre class="share-grid">{relic.shareGrid}</pre>
+            <div class="map-block">
+              <span class="map-caption">Excavation map</span>
+              <div
+                class="excavation-map"
+                role="img"
+                aria-label={`Excavation map, ${relic.piNative.toFixed(1)} percent pi-native`}
+              >
+                {relic.shareGrid.split("\n").map((row) => (
+                  <div class="map-row">
+                    {Array.from(row).map((glyph) => (
+                      <i
+                        data-k={glyph === "🟩"
+                          ? "exact"
+                          : glyph === "🟨"
+                            ? "near"
+                            : glyph === "⬜"
+                              ? "lossy"
+                              : "earth"}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
             <p class="truth-note result-truth">
               Found in Pi searches a finite indexed region of pi. Scores are
               excavation scores, not compression claims.
