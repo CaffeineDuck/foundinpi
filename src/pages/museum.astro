@@ -13,6 +13,18 @@ const digSiteLabels = [
 ];
 const digSiteSummary =
   digSiteLabels.length === 1 ? digSiteLabels[0] : `${digSiteLabels.length} dig sites`;
+
+// rarity filter chips, ordered high -> low, limited to what is present
+const RARITY_ORDER = [
+  "Cathedral Grade",
+  "Museum Grade",
+  "Field Relic",
+  "Fragment Cluster",
+  "Deep Earth"
+];
+const presentRarities = RARITY_ORDER.filter((rarity) =>
+  relics.some((relic) => relic.rarity === rarity)
+);
 const title = "Pi Relic Museum - Public Excavations From Found in Pi";
 const description =
   "Browse public image relics recovered from a finite indexed pi dig site, ranked by views and excavation score.";
@@ -48,33 +60,154 @@ const jsonLd = {
 
     {
       relics.length > 0 ? (
-        <section class="relic-grid" aria-label="Public relics">
-          {relics.map((relic) => (
-            <a class="relic-card" href={`/r/${relic.id}`}>
-              <div class="relic-card-plate">
-                <span class="relic-card-no">FIP-{relic.id}</span>
-                <span class="relic-card-tag">{relic.rarity}</span>
-                <img
-                  src={publicArtifactUrl(relic.artifactKey)}
-                  alt={`${relic.title} pi relic`}
-                  loading="lazy"
-                  width="480"
-                  height="360"
-                />
-              </div>
-              <span class="relic-card-body">
-                <strong>{relic.title}</strong>
-                <span class="relic-card-stat">
-                  <b>{relic.piNative.toFixed(1)}%</b> pi-native
+        <Fragment>
+          <div class="museum-controls">
+            <div class="control-group" role="group" aria-label="Sort relics">
+              <span class="control-label">Sort</span>
+              <button class="chip active" type="button" data-sort="views">
+                Most viewed
+              </button>
+              <button class="chip" type="button" data-sort="score">
+                Top grade
+              </button>
+              <button class="chip" type="button" data-sort="pinative">
+                Most pi-native
+              </button>
+              <button class="chip" type="button" data-sort="new">
+                Newest
+              </button>
+            </div>
+            <div class="control-group" role="group" aria-label="Filter by rarity">
+              <span class="control-label">Rarity</span>
+              <button class="chip active" type="button" data-filter="all">
+                All
+              </button>
+              {presentRarities.map((rarity) => (
+                <button class="chip" type="button" data-filter={rarity}>
+                  {rarity}
+                </button>
+              ))}
+            </div>
+            <span class="control-count" data-shown>
+              {relics.length} artifacts
+            </span>
+          </div>
+
+          <section class="relic-grid" aria-label="Public relics">
+            {relics.map((relic) => (
+              <a
+                class="relic-card"
+                href={`/r/${relic.id}`}
+                data-rarity={relic.rarity}
+                data-views={relic.views}
+                data-score={relic.score}
+                data-pinative={relic.piNative}
+                data-created={relic.createdAt}
+              >
+                <div class="relic-card-plate">
+                  <span class="relic-card-no">FIP-{relic.id}</span>
+                  <span class="relic-card-tag">{relic.rarity}</span>
+                  <img
+                    src={publicArtifactUrl(relic.artifactKey)}
+                    alt={`${relic.title} pi relic`}
+                    loading="lazy"
+                    width="480"
+                    height="360"
+                  />
+                </div>
+                <span class="relic-card-body">
+                  <strong>{relic.title}</strong>
+                  <span class="relic-card-stat">
+                    <b>{relic.piNative.toFixed(1)}%</b> pi-native
+                  </span>
+                  <small>
+                    {MODES[relic.mode].label} · {relic.digSite.split(":")[0]} ·{" "}
+                    {relic.views.toLocaleString()} views
+                  </small>
                 </span>
-                <small>
-                  {MODES[relic.mode].label} · {relic.digSite.split(":")[0]} ·{" "}
-                  {relic.views.toLocaleString()} views
-                </small>
-              </span>
-            </a>
-          ))}
-        </section>
+              </a>
+            ))}
+          </section>
+
+          <p class="museum-empty-filter" data-empty-filter hidden>
+            No relics match this rarity yet.
+          </p>
+
+          <script is:inline>
+            (function () {
+              const grid = document.querySelector(".relic-grid");
+              if (!grid) return;
+              const cards = Array.prototype.slice.call(
+                grid.querySelectorAll(".relic-card")
+              );
+              const shown = document.querySelector("[data-shown]");
+              const emptyNote = document.querySelector("[data-empty-filter]");
+              const total = cards.length;
+              let sortKey = "views";
+              let rarity = "all";
+
+              function num(el, key) {
+                return Number(el.dataset[key] || 0);
+              }
+
+              function render() {
+                const sorted = cards.slice().sort(function (a, b) {
+                  if (sortKey === "new") {
+                    return (b.dataset.created || "").localeCompare(
+                      a.dataset.created || ""
+                    );
+                  }
+                  return num(b, sortKey) - num(a, sortKey);
+                });
+                sorted.forEach(function (card) {
+                  grid.appendChild(card);
+                });
+
+                let visible = 0;
+                cards.forEach(function (card) {
+                  const match = rarity === "all" || card.dataset.rarity === rarity;
+                  card.hidden = !match;
+                  if (match) visible += 1;
+                });
+
+                if (shown) {
+                  shown.textContent =
+                    visible === total
+                      ? total + " artifacts"
+                      : visible + " of " + total + " artifacts";
+                }
+                if (emptyNote) emptyNote.hidden = visible !== 0;
+                grid.hidden = visible === 0;
+              }
+
+              document.querySelectorAll("[data-sort]").forEach(function (button) {
+                button.addEventListener("click", function () {
+                  sortKey = button.dataset.sort;
+                  document
+                    .querySelectorAll("[data-sort]")
+                    .forEach(function (other) {
+                      other.classList.toggle("active", other === button);
+                    });
+                  render();
+                });
+              });
+
+              document.querySelectorAll("[data-filter]").forEach(function (button) {
+                button.addEventListener("click", function () {
+                  rarity = button.dataset.filter;
+                  document
+                    .querySelectorAll("[data-filter]")
+                    .forEach(function (other) {
+                      other.classList.toggle("active", other === button);
+                    });
+                  render();
+                });
+              });
+
+              render();
+            })();
+          </script>
+        </Fragment>
       ) : (
         <section class="empty-museum">
           <h2>No public relics yet</h2>

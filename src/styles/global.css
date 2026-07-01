@@ -1379,10 +1379,8 @@ p {
 }
 
 .score-hero {
-  display: flex;
-  align-items: baseline;
-  gap: 16px;
-  flex-wrap: wrap;
+  display: grid;
+  gap: 14px;
   padding-bottom: 20px;
   margin-bottom: 20px;
   border-bottom: 1px solid var(--line);
@@ -1417,16 +1415,28 @@ p {
 }
 
 .score-meta {
-  display: grid;
-  gap: 10px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
 }
 
 .score-label {
   font-family: var(--font-mono);
-  font-size: 0.76rem;
+  font-size: 0.74rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
+}
+
+.score-label::after {
+  content: "";
+  display: inline-block;
+  width: 1px;
+  height: 0.85em;
+  margin-left: 14px;
+  background: var(--line-strong);
+  vertical-align: -0.1em;
 }
 
 .rarity-badge {
@@ -1858,6 +1868,87 @@ p {
   font-family: var(--font-mono);
   font-size: 0.72rem;
   letter-spacing: 0.03em;
+}
+
+/* museum sort + rarity filter controls */
+.museum-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 22px;
+  margin-bottom: 22px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.control-label {
+  margin-right: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.chip {
+  padding: 7px 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-dim);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  transition: color 0.16s ease, border-color 0.16s ease, background 0.16s ease,
+    box-shadow 0.2s ease, transform 0.14s ease;
+}
+
+.chip:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+
+.chip:active {
+  transform: scale(0.95);
+}
+
+.chip.active {
+  background: var(--accent);
+  color: var(--ink-on-accent);
+  border-color: var(--accent);
+  box-shadow: var(--glow-soft);
+}
+
+.control-count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.museum-empty-filter {
+  margin: 44px 0;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+}
+
+/* the [hidden] attribute must beat .relic-card/.relic-grid display rules */
+.relic-card[hidden],
+.relic-grid[hidden] {
+  display: none;
 }
 
 .header-links {
