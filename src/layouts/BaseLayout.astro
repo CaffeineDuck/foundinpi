@@ -31,7 +31,8 @@ const ogImage = image ?? new URL("/og-default.png", Astro.url.origin).toString()
       (function () {
         try {
           var t = localStorage.getItem("fip-theme");
-          if (t !== "lab" && t !== "bone" && t !== "cursed") t = "lab";
+          if (t !== "lab" && t !== "bone" && t !== "cursed" && t !== "console")
+            t = "lab";
           document.documentElement.dataset.theme = t;
         } catch (e) {
           document.documentElement.dataset.theme = "lab";
@@ -86,6 +87,7 @@ const ogImage = image ?? new URL("/og-default.png", Astro.url.origin).toString()
       <button type="button" data-theme-btn="lab">Lab</button>
       <button type="button" data-theme-btn="bone">Bone</button>
       <button type="button" data-theme-btn="cursed">Cursed</button>
+      <button type="button" data-theme-btn="console">Console</button>
     </div>
     <script is:inline>
       (function () {
