@@ -7,3 +7,4 @@ dist/
 .wrangler/
 .astro/
 .DS_Store
+_shoot.mjs

@@ -6,6 +6,6 @@
     "paths": {
       "@/*": ["src/*"]
     }
-  }
+  },
+  "exclude": ["dist", "node_modules", ".astro", ".wrangler", "_shoot.mjs"]
 }
-
