@@ -8,6 +8,11 @@ export const prerender = false;
 
 const relics = await listRelics(env as EnvLike, 36);
 const totalViews = relics.reduce((sum, relic) => sum + relic.views, 0);
+const digSiteLabels = [
+  ...new Set(relics.map((relic) => relic.digSite.split(":")[0]))
+];
+const digSiteSummary =
+  digSiteLabels.length === 1 ? digSiteLabels[0] : `${digSiteLabels.length} dig sites`;
 const title = "Pi Relic Museum - Public Excavations From Found in Pi";
 const description =
   "Browse public image relics recovered from a finite indexed pi dig site, ranked by views and excavation score.";
@@ -31,7 +36,7 @@ const jsonLd = {
         {relics.length > 0 ? (
           <p class="museum-count">
             {relics.length} artifacts cataloged · {totalViews.toLocaleString()}{" "}
-            visits · Dig Site I
+            visits · {digSiteSummary}
           </p>
         ) : null}
       </div>
@@ -63,7 +68,8 @@ const jsonLd = {
                   <b>{relic.piNative.toFixed(1)}%</b> pi-native
                 </span>
                 <small>
-                  {MODES[relic.mode].label} · {relic.views.toLocaleString()} views
+                  {MODES[relic.mode].label} · {relic.digSite.split(":")[0]} ·{" "}
+                  {relic.views.toLocaleString()} views
                 </small>
               </span>
             </a>

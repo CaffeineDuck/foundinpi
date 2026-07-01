@@ -20,9 +20,12 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  DEFAULT_DIG_SITE_ID,
+  DIG_SITES,
   MODES,
   TILE_CLASS_COLORS,
-  TILE_CLASS_LABELS
+  TILE_CLASS_LABELS,
+  type DigSiteId
 } from "../lib/excavation/constants";
 import type {
   ExcavationMode,
@@ -31,6 +34,7 @@ import type {
   TileExcavation,
   WorkerResponse
 } from "../lib/excavation/types";
+import "../styles/dig-site.css";
 
 type PublishState =
   | { status: "idle" }
@@ -70,6 +74,8 @@ const MODES_IN_ORDER: ExcavationMode[] = [
   "holy",
   "scientific"
 ];
+
+const DIG_SITE_STORAGE_KEY = "foundinpi:dig-site";
 
 // Streamed under the viewport before a specimen is loaded.
 const PI_DIGIT_CHUNKS = [
@@ -116,6 +122,10 @@ const BREAKDOWN: ReadonlyArray<{ k: TileClass; label: string }> = [
   { k: "lossy", label: "Lossy Pi" },
   { k: "earth", label: "Earth Bytes" }
 ];
+
+function isDigSiteId(value: string | null): value is DigSiteId {
+  return DIG_SITES.some((site) => site.id === value);
+}
 
 // Eases a number up to its target whenever `resetKey` changes.
 function useCountUp(target: number, resetKey: string | number) {
@@ -335,6 +345,7 @@ function buildShareText(
 ${result.summary.piNative.toFixed(1)}% pi-native
 Longest fossil: ${result.summary.longestFossil} bytes
 Rarity: ${result.summary.rarity}
+${result.summary.digSite.split(":")[0]}
 ${result.summary.shareGrid}
 ${url}`;
 }
@@ -357,6 +368,8 @@ function tileAt(
 
 export default function ExcavationApp() {
   const [mode, setMode] = useState<ExcavationMode>("museum");
+  const [digSiteId, setDigSiteId] =
+    useState<DigSiteId>(DEFAULT_DIG_SITE_ID);
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   const [result, setResult] = useState<ExcavationResult | null>(null);
   const [progress, setProgress] = useState(0);
@@ -389,6 +402,10 @@ export default function ExcavationApp() {
     () => tileAt(result?.tiles ?? [], hoverPoint),
     [hoverPoint, result]
   );
+  const activeDigSite = useMemo(
+    () => DIG_SITES.find((site) => site.id === digSiteId) ?? DIG_SITES[0],
+    [digSiteId]
+  );
 
   const stageState = isWorking ? "working" : result ? "ready" : "idle";
   const phase: "intro" | "scanning" | "relic" =
@@ -414,6 +431,11 @@ export default function ExcavationApp() {
     return () => {
       workerRef.current?.terminate();
     };
+  }, []);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem(DIG_SITE_STORAGE_KEY);
+    if (isDigSiteId(saved)) setDigSiteId(saved);
   }, []);
 
   useEffect(() => {
@@ -479,7 +501,7 @@ export default function ExcavationApp() {
   async function excavate(
     file: File,
     nextMode = mode,
-    options?: { demo?: boolean }
+    options?: { demo?: boolean; digSiteId?: DigSiteId }
   ) {
     if (!file.type.startsWith("image/")) {
       setProgressLabel("Choose an image file");
@@ -487,6 +509,8 @@ export default function ExcavationApp() {
     }
 
     const isDemo = options?.demo ?? lastIsDemoRef.current;
+    const selectedDigSite =
+      DIG_SITES.find((site) => site.id === options?.digSiteId) ?? activeDigSite;
     setIsWorking(true);
     setProgress(0.03);
     setProgressLabel("Preparing specimen");
@@ -508,7 +532,7 @@ export default function ExcavationApp() {
 
       setSourceUrl(prepared.canvas.toDataURL("image/png"));
       setProgress(0.07);
-      setProgressLabel("Opening pi index");
+      setProgressLabel(`Opening ${selectedDigSite.shortLabel}`);
 
       const jobId = activeJobIdRef.current + 1;
       activeJobIdRef.current = jobId;
@@ -522,6 +546,7 @@ export default function ExcavationApp() {
           height: prepared.height,
           imageBuffer: prepared.imageData.data.buffer,
           mode: nextMode,
+          digSiteId: selectedDigSite.id,
           tileSize
         },
         [prepared.imageData.data.buffer]
@@ -537,12 +562,60 @@ export default function ExcavationApp() {
 
   function handleFileList(files: FileList | null) {
     const file = files?.[0];
-    if (file) void excavate(file, mode, { demo: false });
+    if (file) void excavate(file, mode, { demo: false, digSiteId });
   }
 
   async function excavateSample() {
     const file = await sampleFile();
-    void excavate(file, mode, { demo: true });
+    void excavate(file, mode, { demo: true, digSiteId });
+  }
+
+  function chooseDigSite(nextDigSiteId: DigSiteId) {
+    if (nextDigSiteId === digSiteId) return;
+
+    setDigSiteId(nextDigSiteId);
+    window.localStorage.setItem(DIG_SITE_STORAGE_KEY, nextDigSiteId);
+
+    if (lastFileRef.current) {
+      void excavate(lastFileRef.current, mode, {
+        demo: lastIsDemoRef.current,
+        digSiteId: nextDigSiteId
+      });
+    }
+  }
+
+  function digSiteSelector(className = "") {
+    return (
+      <div
+        className={`mode-seg dig-site-seg ${className}`.trim()}
+        role="group"
+        aria-label="Pi dig site"
+      >
+        {DIG_SITES.map((site) => (
+          <button
+            key={site.id}
+            className={
+              site.id === digSiteId
+                ? "mode-card dig-site-card active"
+                : "mode-card dig-site-card"
+            }
+            type="button"
+            disabled={isWorking}
+            aria-pressed={site.id === digSiteId}
+            title={`${site.indexVersion} · ${site.digits.toLocaleString()} digits`}
+            onClick={() => chooseDigSite(site.id)}
+          >
+            <span className="mode-top">
+              <Pickaxe size={15} aria-hidden="true" />
+              {site.shortLabel}
+            </span>
+            <em>
+              {site.depthLabel} · {site.note}
+            </em>
+          </button>
+        ))}
+      </div>
+    );
   }
 
   function handleStageMove(event: React.PointerEvent<HTMLDivElement>) {
@@ -618,7 +691,11 @@ export default function ExcavationApp() {
     ctx.textAlign = "right";
     ctx.fillStyle = muted;
     ctx.font = `700 15px ${mono}, monospace`;
-    ctx.fillText("DIG SITE I · foundinpi.com", 1152, 72);
+    ctx.fillText(
+      `${result.summary.digSite.split(":")[0].toUpperCase()} · foundinpi.com`,
+      1152,
+      72
+    );
     ctx.textAlign = "left";
     ctx.strokeStyle = line;
     ctx.beginPath();
@@ -860,7 +937,9 @@ export default function ExcavationApp() {
             ))}
           </div>
 
-          <p className="intro-eyebrow">Image archaeology — Dig Site I</p>
+          <p className="intro-eyebrow">
+            Image archaeology — {activeDigSite.shortLabel}
+          </p>
           <h1 className="intro-title">
             Drop an image.
             <br />
@@ -870,6 +949,8 @@ export default function ExcavationApp() {
             Upload a photo and we excavate it from a finite region of pi, then
             hand you a shareable relic with a rarity score.
           </p>
+
+          {digSiteSelector("dig-site-seg-intro")}
 
           <label
             className="drop-hero"
@@ -1028,6 +1109,8 @@ export default function ExcavationApp() {
             </div>
 
             <div className="stage-tools">
+              {digSiteSelector("dig-site-seg-tools")}
+
               <div className="mode-seg" role="group" aria-label="Reconstruction mode">
                 {MODES_IN_ORDER.map((entry) => {
                   const Icon = MODE_ICON[entry];
@@ -1043,7 +1126,8 @@ export default function ExcavationApp() {
                         setMode(entry);
                         if (lastFileRef.current) {
                           void excavate(lastFileRef.current, entry, {
-                            demo: lastIsDemoRef.current
+                            demo: lastIsDemoRef.current,
+                            digSiteId
                           });
                         }
                       }}
@@ -1109,9 +1193,11 @@ export default function ExcavationApp() {
                 <p className="live-label">{progressLabel}</p>
                 <ul className="field-log">
                   <li>
-                    Opening index <b>pi32-10m-v1</b>
+                    Opening index <b>{activeDigSite.indexVersion}</b>
                   </li>
-                  <li>Reading 10,000,000 π digits</li>
+                  <li>
+                    Reading {activeDigSite.digits.toLocaleString()} π digits
+                  </li>
                   <li>Matching 32-digit windows</li>
                   <li>Classifying recovered tiles</li>
                 </ul>

@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 
 import {
+  type DigSiteId,
   DIG_SITE_FRAGMENT_DIGITS,
   DIG_SITE_FRAGMENT_STRIDE,
   TILE_CLASS_COLORS
@@ -27,6 +28,7 @@ const SIGNATURE_BUCKETS = 256;
 const MIN_COLOR_CANDIDATES = 160;
 const COLOR_SEARCH_RADIUS = 1;
 const COLOR_FALLBACK_RADIUS = 2;
+const DEEP_SITE_FRAGMENT_THRESHOLD = 1_000_000;
 
 type PiSearchIndex = {
   catalogue: PiCatalogue;
@@ -50,16 +52,21 @@ type PiFragmentView = {
   raw: string;
 };
 
-let cachedSearchIndex: PiSearchIndex | null = null;
+const cachedSearchIndexes = new Map<DigSiteId, PiSearchIndex>();
 
 function emit(message: WorkerResponse) {
   ctx.postMessage(message);
 }
 
-function colorDistance(a: [number, number, number], b: [number, number, number]) {
-  const dr = a[0] - b[0];
-  const dg = a[1] - b[1];
-  const db = a[2] - b[2];
+function fragmentColorDistance(
+  catalogue: PiCatalogue,
+  fragmentIndex: number,
+  color: [number, number, number]
+) {
+  const base = fragmentBase(fragmentIndex);
+  const dr = color[0] - catalogue.bytes[base];
+  const dg = color[1] - catalogue.bytes[base + 1];
+  const db = color[2] - catalogue.bytes[base + 2];
   return Math.sqrt(dr * dr + dg * dg + db * db);
 }
 
@@ -240,11 +247,14 @@ function signatureDistanceSum(
   signature: number[]
 ) {
   let distance = 0;
+  const base = fragmentBase(fragmentIndex) + 3;
 
-  for (let index = 0; index < 16; index += 1) {
-    distance += Math.abs(
-      (signature[index] ?? 0) - signatureValue(catalogue, fragmentIndex, index)
-    );
+  for (let packedIndex = 0; packedIndex < 8; packedIndex += 1) {
+    const packed = catalogue.bytes[base + packedIndex];
+    const signatureIndex = packedIndex * 2;
+    distance +=
+      Math.abs((signature[signatureIndex] ?? 0) - ((packed >> 4) & 0x0f)) +
+      Math.abs((signature[signatureIndex + 1] ?? 0) - (packed & 0x0f));
   }
 
   return distance;
@@ -373,13 +383,15 @@ function buildSearchIndex(catalogue: PiCatalogue) {
   } satisfies PiSearchIndex;
 }
 
-async function getPiSearchIndex() {
-  if (cachedSearchIndex) return cachedSearchIndex;
+async function getPiSearchIndex(digSiteId: DigSiteId) {
+  const cached = cachedSearchIndexes.get(digSiteId);
+  if (cached) return cached;
 
-  const catalogue = await getPiCatalogue();
-  cachedSearchIndex = buildSearchIndex(catalogue);
+  const catalogue = await getPiCatalogue(digSiteId);
+  const searchIndex = buildSearchIndex(catalogue);
+  cachedSearchIndexes.set(catalogue.digSite.id, searchIndex);
 
-  return cachedSearchIndex;
+  return searchIndex;
 }
 
 function findNearestPiFragment(
@@ -418,9 +430,10 @@ function findNearestPiFragment(
     seen[candidateIndex] = seenMark;
     candidateCount += 1;
 
-    const candidateColorDistance = colorDistance(
-      color,
-      fragmentRgb(catalogue, candidateIndex)
+    const candidateColorDistance = fragmentColorDistance(
+      catalogue,
+      candidateIndex,
+      color
     );
     const candidateSignatureDistanceSum = signatureDistanceSum(
       catalogue,
@@ -475,7 +488,12 @@ function findNearestPiFragment(
     }
   }
 
-  searchColorBuckets(COLOR_SEARCH_RADIUS);
+  const colorSearchRadius =
+    catalogue.fragments >= DEEP_SITE_FRAGMENT_THRESHOLD ? 0 : COLOR_SEARCH_RADIUS;
+  const colorFallbackRadius =
+    colorSearchRadius === 0 ? COLOR_SEARCH_RADIUS : COLOR_FALLBACK_RADIUS;
+
+  searchColorBuckets(colorSearchRadius);
 
   const signatureKey = signatureBucketKey(signature);
   const signatureStart = signatureBucketStarts[signatureKey];
@@ -489,7 +507,7 @@ function findNearestPiFragment(
   }
 
   if (candidateCount < MIN_COLOR_CANDIDATES) {
-    searchColorBuckets(COLOR_FALLBACK_RADIUS);
+    searchColorBuckets(colorFallbackRadius);
   }
 
   return {
@@ -513,8 +531,8 @@ async function processImage(request: WorkerRequest) {
     label: "Indexing dig site"
   });
 
-  const searchIndex = await getPiSearchIndex();
-  const stats = getDigSiteStats(searchIndex.catalogue.fragments);
+  const searchIndex = await getPiSearchIndex(request.digSiteId);
+  const stats = getDigSiteStats(searchIndex.catalogue);
   const source = new Uint8ClampedArray(request.imageBuffer);
   const relic = new Uint8ClampedArray(source.length);
   const heatmap = new Uint8ClampedArray(source.length);
@@ -635,7 +653,12 @@ async function processImage(request: WorkerRequest) {
     progress: 0.9,
     label: "Cataloging relic"
   });
-  const summary = summarizeTiles(tiles, stats.fragments);
+  const summary = summarizeTiles(
+    tiles,
+    stats.fragments,
+    searchIndex.catalogue.digSite,
+    stats.digits
+  );
 
   return {
     width,

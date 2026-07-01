@@ -15,6 +15,10 @@ export type RelicRecord = {
   earthPct: number;
   longestFossil: number;
   digSite: string;
+  indexVersion: string;
+  indexChecksum: string;
+  searchedDigits: number;
+  indexedFragments: number;
   shareGrid: string;
   summary: string;
   artifactKey: string;
@@ -50,6 +54,10 @@ export type PublishRelicInput = {
   earthPct: number;
   longestFossil: number;
   digSite: string;
+  indexVersion?: string;
+  indexChecksum?: string;
+  searchedDigits?: number;
+  indexedFragments?: number;
   shareGrid: string;
   summary: string;
   relicImage: string;

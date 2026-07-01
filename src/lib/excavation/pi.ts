@@ -1,13 +1,16 @@
 import {
-  DIG_SITE_DIGITS,
+  DEFAULT_DIG_SITE_ID,
+  type DigSite,
+  type DigSiteId,
   DIG_SITE_FRAGMENT_DIGITS,
   DIG_SITE_FRAGMENT_STRIDE,
-  DIG_SITE_INDEX_URL
+  getDigSite
 } from "./constants";
 
 export type PiCatalogue = {
   bytes: Uint8Array;
   fragments: number;
+  digSite: DigSite;
   rawDigits?: string;
 };
 
@@ -16,7 +19,7 @@ export const PACKED_FRAGMENT_BYTES = 11;
 const DEV_FALLBACK_DIGITS = 6144;
 
 let cachedDigits = "";
-let cachedCatalogue: PiCatalogue | null = null;
+const cachedCatalogues = new Map<DigSiteId, PiCatalogue>();
 
 function arctan(invX: bigint, scale: bigint) {
   const invX2 = invX * invX;
@@ -72,18 +75,19 @@ function packFragment(bytes: Uint8Array, fragmentIndex: number, raw: string) {
   }
 }
 
-function validatePackedCatalogue(bytes: Uint8Array) {
+function validatePackedCatalogue(bytes: Uint8Array, digSite: DigSite) {
   if (bytes.byteLength % PACKED_FRAGMENT_BYTES !== 0) {
     throw new Error("Dig site index is corrupt");
   }
 
   return {
     bytes,
-    fragments: bytes.byteLength / PACKED_FRAGMENT_BYTES
+    fragments: bytes.byteLength / PACKED_FRAGMENT_BYTES,
+    digSite
   } satisfies PiCatalogue;
 }
 
-function buildFallbackCatalogue() {
+function buildFallbackCatalogue(digSite: DigSite) {
   const digits = getPiDigits(DEV_FALLBACK_DIGITS);
   const fragments =
     Math.floor((digits.length - DIG_SITE_FRAGMENT_DIGITS) / DIG_SITE_FRAGMENT_STRIDE) +
@@ -102,32 +106,38 @@ function buildFallbackCatalogue() {
   return {
     bytes,
     fragments,
+    digSite,
     rawDigits: digits
   } satisfies PiCatalogue;
 }
 
-export async function getPiCatalogue() {
-  if (cachedCatalogue) return cachedCatalogue;
+export async function getPiCatalogue(digSiteId: DigSiteId = DEFAULT_DIG_SITE_ID) {
+  const digSite = getDigSite(digSiteId);
+  const cached = cachedCatalogues.get(digSite.id);
+  if (cached) return cached;
 
+  let catalogue: PiCatalogue;
   try {
-    const response = await fetch(DIG_SITE_INDEX_URL);
+    const response = await fetch(digSite.indexUrl);
     if (!response.ok) {
       throw new Error(`Unable to load dig site index: ${response.status}`);
     }
 
-    cachedCatalogue = validatePackedCatalogue(
-      new Uint8Array(await response.arrayBuffer())
+    catalogue = validatePackedCatalogue(
+      new Uint8Array(await response.arrayBuffer()),
+      digSite
     );
   } catch {
-    cachedCatalogue = buildFallbackCatalogue();
+    catalogue = buildFallbackCatalogue(digSite);
   }
 
-  return cachedCatalogue;
+  cachedCatalogues.set(digSite.id, catalogue);
+  return catalogue;
 }
 
-export function getDigSiteStats(indexedFragments: number) {
+export function getDigSiteStats(catalogue: PiCatalogue) {
   return {
-    digits: DIG_SITE_DIGITS,
-    fragments: indexedFragments
+    digits: catalogue.rawDigits?.length ?? catalogue.digSite.digits,
+    fragments: catalogue.fragments
   };
 }

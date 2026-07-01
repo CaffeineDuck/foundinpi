@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-const digits = Number(process.argv[2] ?? 10_000_000);
+const digits = Number(process.argv[2] ?? 1_000_000);
 const fragmentDigits = 32;
 const stride = 7;
 

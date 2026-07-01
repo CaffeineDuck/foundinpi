@@ -26,12 +26,23 @@ Found in Pi is playful, not fake science.
 
 - It does not search all digits of pi.
 - It does not compress files into pi.
-- It searches a finite indexed region: **Dig Site I**.
+- It searches a finite indexed region: **Dig Site I** by default.
 - Scores are excavation scores under this app's algorithm.
 - Original pixels are used for matching only; the relic image is rendered from
   pi-derived fragments and reconstruction classes.
 
-The current dig site is `pi32-10m-v1`:
+The app currently ships two finite dig sites:
+
+**Dig Site I** (`pi32-1m-v1`) is the default:
+
+- First `1,000,000` decimal digits of pi.
+- Overlapping `32`-digit visual fragments.
+- `7`-digit stride.
+- `142,853` indexed fragments.
+- Packed index: `public/dig-sites/pi32-1m-v1.bin`.
+- SHA-256: `555ee7260f240b7a6808aafcaac31d1ace809b3d8e55da4245f6a92c3974fe66`.
+
+**Dig Site II** (`pi32-10m-v1`) is opt-in:
 
 - First `10,000,000` decimal digits of pi.
 - Overlapping `32`-digit visual fragments.

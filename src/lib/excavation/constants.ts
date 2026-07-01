@@ -1,16 +1,55 @@
 import type { ExcavationMode, TileClass } from "./types";
 
-export const DIG_SITE_DIGITS = 10_000_000;
 export const DIG_SITE_FRAGMENT_DIGITS = 32;
 export const DIG_SITE_FRAGMENT_STRIDE = 7;
 export const DIG_SITE_FRAGMENT_BYTES = 3;
-export const DIG_SITE_INDEX_VERSION = "pi32-10m-v1";
-export const DIG_SITE_INDEX_URL = "/dig-sites/pi32-10m-v1.bin";
-export const DIG_SITE_INDEX_SHA256 =
-  "ea6785ba281de9ae879fa730ba70662d729d1dd5600d12de7d1734315b0f5359";
 
-export const DIG_SITE_LABEL =
-  "Dig Site I: first 10,000,000 decimal digits of pi, indexed as overlapping 32-digit visual fragments";
+export const DIG_SITES = [
+  {
+    id: "dig-site-i",
+    shortLabel: "Dig Site I",
+    label:
+      "Dig Site I: first 1,000,000 decimal digits of pi, indexed as overlapping 32-digit visual fragments",
+    indexVersion: "pi32-1m-v1",
+    indexUrl: "/dig-sites/pi32-1m-v1.bin",
+    indexChecksum:
+      "555ee7260f240b7a6808aafcaac31d1ace809b3d8e55da4245f6a92c3974fe66",
+    digits: 1_000_000,
+    indexedFragments: 142_853,
+    depthLabel: "1M digits",
+    note: "Fast default"
+  },
+  {
+    id: "dig-site-ii",
+    shortLabel: "Dig Site II",
+    label:
+      "Dig Site II: first 10,000,000 decimal digits of pi, indexed as overlapping 32-digit visual fragments",
+    indexVersion: "pi32-10m-v1",
+    indexUrl: "/dig-sites/pi32-10m-v1.bin",
+    indexChecksum:
+      "ea6785ba281de9ae879fa730ba70662d729d1dd5600d12de7d1734315b0f5359",
+    digits: 10_000_000,
+    indexedFragments: 1_428_567,
+    depthLabel: "10M digits",
+    note: "Deeper search"
+  }
+] as const;
+
+export type DigSite = (typeof DIG_SITES)[number];
+export type DigSiteId = DigSite["id"];
+
+export const DEFAULT_DIG_SITE_ID = "dig-site-i" satisfies DigSiteId;
+export const DEFAULT_DIG_SITE = DIG_SITES[0];
+
+export function getDigSite(id: string | undefined): DigSite {
+  return DIG_SITES.find((site) => site.id === id) ?? DEFAULT_DIG_SITE;
+}
+
+export const DIG_SITE_DIGITS = DEFAULT_DIG_SITE.digits;
+export const DIG_SITE_INDEX_VERSION = DEFAULT_DIG_SITE.indexVersion;
+export const DIG_SITE_INDEX_URL = DEFAULT_DIG_SITE.indexUrl;
+export const DIG_SITE_INDEX_SHA256 = DEFAULT_DIG_SITE.indexChecksum;
+export const DIG_SITE_LABEL = DEFAULT_DIG_SITE.label;
 
 export const TILE_CLASS_LABELS: Record<TileClass, string> = {
   exact: "Exact Pi",

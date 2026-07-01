@@ -1,9 +1,6 @@
 import {
-  DIG_SITE_DIGITS,
   DIG_SITE_FRAGMENT_BYTES,
-  DIG_SITE_INDEX_SHA256,
-  DIG_SITE_INDEX_VERSION,
-  DIG_SITE_LABEL
+  type DigSite
 } from "./constants";
 import type { ExcavationSummary, TileClass, TileExcavation } from "./types";
 
@@ -65,8 +62,13 @@ function buildShareGrid(tiles: TileExcavation[]) {
   return lines.join("\n");
 }
 
-function hashTiles(tiles: TileExcavation[]) {
+function hashTiles(tiles: TileExcavation[], salt: string) {
   let hash = 2166136261;
+
+  for (let index = 0; index < salt.length; index += 1) {
+    hash ^= salt.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
 
   for (const tile of tiles) {
     const text = `${tile.className}:${tile.coordinate}:${tile.distance}:${tile.source.join(",")}`;
@@ -79,7 +81,7 @@ function hashTiles(tiles: TileExcavation[]) {
   return hash >>> 0;
 }
 
-function nameRelic(seedNumber: number) {
+function nameRelic(seedNumber: number, digSite: DigSite) {
   const materials = [
     "Mossglass",
     "Obsidian",
@@ -115,7 +117,7 @@ function nameRelic(seedNumber: number) {
     "with Missing Edges",
     "for a Borrowed Coordinate",
     "of the Quiet Window",
-    "from Dig Site I",
+    `from ${digSite.shortLabel}`,
     "with a Salted Checksum",
     "beneath the Indexed Rain",
     "for the Last Near Match",
@@ -138,7 +140,9 @@ function nameRelic(seedNumber: number) {
 
 export function summarizeTiles(
   tiles: TileExcavation[],
-  indexedFragments: number
+  indexedFragments: number,
+  digSite: DigSite,
+  searchedDigits: number = digSite.digits
 ): ExcavationSummary {
   const total = tiles.length || 1;
   const counts: Record<TileClass, number> = {
@@ -173,9 +177,9 @@ export function summarizeTiles(
     Math.round((exactPct + nearPct * 0.55 + lossyPct * 0.2) * 10) / 10;
   const rarity = rarityFor(score);
   const longestFossil = longestRun * DIG_SITE_FRAGMENT_BYTES;
-  const seedNumber = hashTiles(tiles);
+  const seedNumber = hashTiles(tiles, digSite.id);
   const seed = seedNumber.toString(36).toUpperCase();
-  const relicName = nameRelic(seedNumber);
+  const relicName = nameRelic(seedNumber, digSite);
 
   return {
     relicName,
@@ -188,11 +192,11 @@ export function summarizeTiles(
     earthPct,
     rarity,
     longestFossil,
-    digSite: DIG_SITE_LABEL,
+    digSite: digSite.label,
     indexedFragments,
-    searchedDigits: DIG_SITE_DIGITS,
-    indexVersion: DIG_SITE_INDEX_VERSION,
-    indexChecksum: DIG_SITE_INDEX_SHA256,
+    searchedDigits,
+    indexVersion: digSite.indexVersion,
+    indexChecksum: digSite.indexChecksum,
     shareGrid: buildShareGrid(tiles),
     summary: `${relicName}: ${piNative.toFixed(1)}% pi-native, ${longestFossil} byte longest fossil, ${rarity}.`
   };

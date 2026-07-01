@@ -1,3 +1,5 @@
+import type { DigSiteId } from "./constants";
+
 export type ExcavationMode =
   | "museum"
   | "deep"
@@ -56,6 +58,7 @@ export type WorkerRequest = {
   height: number;
   imageBuffer: ArrayBuffer;
   mode: ExcavationMode;
+  digSiteId: DigSiteId;
   tileSize: number;
 };
 

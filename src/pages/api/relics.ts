@@ -9,6 +9,11 @@ const cfEnv = env as EnvLike;
 function isPublishRelicInput(value: unknown): value is PublishRelicInput {
   if (!value || typeof value !== "object") return false;
   const input = value as Record<string, unknown>;
+  const optionalNumber = (key: string) =>
+    input[key] === undefined || typeof input[key] === "number";
+  const optionalString = (key: string) =>
+    input[key] === undefined || typeof input[key] === "string";
+
   return (
     typeof input.mode === "string" &&
     typeof input.rarity === "string" &&
@@ -20,6 +25,10 @@ function isPublishRelicInput(value: unknown): value is PublishRelicInput {
     typeof input.earthPct === "number" &&
     typeof input.longestFossil === "number" &&
     typeof input.digSite === "string" &&
+    optionalString("indexVersion") &&
+    optionalString("indexChecksum") &&
+    optionalNumber("searchedDigits") &&
+    optionalNumber("indexedFragments") &&
     typeof input.shareGrid === "string" &&
     typeof input.summary === "string" &&
     typeof input.relicImage === "string" &&

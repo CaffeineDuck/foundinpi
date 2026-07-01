@@ -5,6 +5,7 @@ import type {
   RelicRecord,
   RelicStatus
 } from "./types";
+import { DEFAULT_DIG_SITE, DIG_SITES } from "../excavation/constants";
 
 export type EnvLike = {
   DB?: D1Database;
@@ -24,6 +25,10 @@ type DbRelic = {
   earth_pct: number;
   longest_fossil: number;
   dig_site: string;
+  index_version?: string | null;
+  index_checksum?: string | null;
+  searched_digits?: number | null;
+  indexed_fragments?: number | null;
   share_grid: string;
   summary: string;
   artifact_key: string;
@@ -106,7 +111,48 @@ function legacyTitle(row: DbRelic) {
   return `${material} ${form} ${serial}`;
 }
 
+function siteFromLabel(label: string | undefined) {
+  const clean = label ?? "";
+  const exact = DIG_SITES.find((site) => site.label === clean);
+  if (exact) return exact;
+  const byVersion = DIG_SITES.find((site) => clean.includes(site.indexVersion));
+  if (byVersion) return byVersion;
+  if (clean.includes("10,000,000")) return DIG_SITES[1];
+  if (clean.includes("1,000,000")) return DIG_SITES[0];
+  return DEFAULT_DIG_SITE;
+}
+
+function resolveInputDigSite(input: PublishRelicInput) {
+  const site =
+    DIG_SITES.find((entry) => entry.indexVersion === input.indexVersion) ??
+    siteFromLabel(input.digSite);
+
+  return {
+    digSite: site.label,
+    indexVersion: input.indexVersion ?? site.indexVersion,
+    indexChecksum: input.indexChecksum ?? site.indexChecksum,
+    searchedDigits: input.searchedDigits ?? site.digits,
+    indexedFragments: input.indexedFragments ?? site.indexedFragments
+  };
+}
+
+function resolveRowDigSite(row: DbRelic) {
+  const site =
+    DIG_SITES.find((entry) => entry.indexVersion === row.index_version) ??
+    siteFromLabel(row.dig_site);
+
+  return {
+    digSite: site.label,
+    indexVersion: row.index_version ?? site.indexVersion,
+    indexChecksum: row.index_checksum ?? site.indexChecksum,
+    searchedDigits: row.searched_digits ?? site.digits,
+    indexedFragments: row.indexed_fragments ?? site.indexedFragments
+  };
+}
+
 function dbToRelic(row: DbRelic): RelicRecord {
+  const digSite = resolveRowDigSite(row);
+
   return {
     id: row.id,
     title: legacyTitle(row),
@@ -119,7 +165,11 @@ function dbToRelic(row: DbRelic): RelicRecord {
     lossyPct: row.lossy_pct,
     earthPct: row.earth_pct,
     longestFossil: row.longest_fossil,
-    digSite: row.dig_site,
+    digSite: digSite.digSite,
+    indexVersion: digSite.indexVersion,
+    indexChecksum: digSite.indexChecksum,
+    searchedDigits: digSite.searchedDigits,
+    indexedFragments: digSite.indexedFragments,
     shareGrid: row.share_grid,
     summary: row.summary,
     artifactKey: row.artifact_key,
@@ -179,6 +229,8 @@ function normalizedScore(value: number) {
 }
 
 function matchSource(input: PublishRelicInput) {
+  const digSite = resolveInputDigSite(input);
+
   return JSON.stringify({
     mode: input.mode,
     rarity: input.rarity,
@@ -189,7 +241,8 @@ function matchSource(input: PublishRelicInput) {
     lossyPct: normalizedScore(input.lossyPct),
     earthPct: normalizedScore(input.earthPct),
     longestFossil: input.longestFossil,
-    digSite: input.digSite,
+    digSite: digSite.digSite,
+    indexVersion: digSite.indexVersion,
     shareGrid: input.shareGrid.trim()
   });
 }
@@ -210,7 +263,8 @@ function exactFallbackKey(relic: RelicRecord) {
     normalizedScore(relic.lossyPct),
     normalizedScore(relic.earthPct),
     relic.longestFossil,
-    relic.digSite
+    relic.digSite,
+    relic.indexVersion
   ].join("|");
 }
 
@@ -256,7 +310,14 @@ function shareGridSimilarity(a: string, b: string) {
 }
 
 function relicSimilarity(input: PublishRelicInput, relic: RelicRecord) {
-  if (input.mode !== relic.mode || input.digSite !== relic.digSite) return 0;
+  const digSite = resolveInputDigSite(input);
+  if (
+    input.mode !== relic.mode ||
+    digSite.digSite !== relic.digSite ||
+    digSite.indexVersion !== relic.indexVersion
+  ) {
+    return 0;
+  }
 
   const grid = shareGridSimilarity(input.shareGrid, relic.shareGrid);
   const score = Math.max(0, 1 - Math.abs(input.score - relic.score) / 28);
@@ -274,6 +335,8 @@ function findMemoryExactDuplicate(
   artifactHash: string,
   matchHash: string
 ) {
+  const digSite = resolveInputDigSite(input);
+
   return (
     [...relics().values()]
       .filter((relic) => relic.status !== "hidden")
@@ -282,7 +345,8 @@ function findMemoryExactDuplicate(
           relic.artifactHash === artifactHash ||
           relic.matchHash === matchHash ||
           (relic.mode === input.mode &&
-            relic.digSite === input.digSite &&
+            relic.digSite === digSite.digSite &&
+            relic.indexVersion === digSite.indexVersion &&
             relic.shareGrid.trim() === input.shareGrid.trim() &&
             Math.abs(relic.score - input.score) <= 0.05 &&
             Math.abs(relic.piNative - input.piNative) <= 0.05)
@@ -297,6 +361,7 @@ async function findDbExactDuplicate(
   matchHash: string
 ) {
   if (!env.DB) return null;
+  const digSite = resolveInputDigSite(input);
 
   const row = await env.DB.prepare(
     `SELECT * FROM relics
@@ -307,6 +372,7 @@ async function findDbExactDuplicate(
          OR (
            mode = ?
            AND dig_site = ?
+           AND (index_version IS NULL OR index_version = ?)
            AND share_grid = ?
            AND ABS(score - ?) <= 0.05
            AND ABS(pi_native - ?) <= 0.05
@@ -319,7 +385,8 @@ async function findDbExactDuplicate(
       artifactHash,
       matchHash,
       input.mode,
-      input.digSite,
+      digSite.digSite,
+      digSite.indexVersion,
       input.shareGrid.trim(),
       input.score,
       input.piNative
@@ -358,18 +425,27 @@ async function findNearMatch(
   input: PublishRelicInput,
   excludeId?: string
 ) {
+  const digSite = resolveInputDigSite(input);
+
   if (env?.DB) {
     const result = await env.DB.prepare(
       `SELECT * FROM relics
        WHERE status IN ('public', 'curated')
          AND mode = ?
          AND dig_site = ?
+         AND (index_version IS NULL OR index_version = ?)
          AND ABS(score - ?) <= 14
          AND ABS(pi_native - ?) <= 14
        ORDER BY views DESC, score DESC, created_at DESC
        LIMIT 96`
     )
-      .bind(input.mode, input.digSite, input.score, input.piNative)
+      .bind(
+        input.mode,
+        digSite.digSite,
+        digSite.indexVersion,
+        input.score,
+        input.piNative
+      )
       .all<DbRelic>();
 
     return bestNearMatch(input, result.results.map(dbToRelic), excludeId);
@@ -390,6 +466,7 @@ export async function createRelic(
     throw new Error("Demo specimens do not enter the museum");
   }
 
+  const digSite = resolveInputDigSite(input);
   const artifact = decodeDataUrl(input.relicImage);
   const card = decodeDataUrl(input.cardImage);
   const artifactHash = await sha256Hex(artifact.bytes);
@@ -429,7 +506,11 @@ export async function createRelic(
     lossyPct: input.lossyPct,
     earthPct: input.earthPct,
     longestFossil: input.longestFossil,
-    digSite: input.digSite,
+    digSite: digSite.digSite,
+    indexVersion: digSite.indexVersion,
+    indexChecksum: digSite.indexChecksum,
+    searchedDigits: digSite.searchedDigits,
+    indexedFragments: digSite.indexedFragments,
     shareGrid: input.shareGrid,
     summary: input.summary,
     artifactKey,
@@ -471,10 +552,11 @@ export async function createRelic(
     await env.DB.prepare(
       `INSERT INTO relics (
         id, title, mode, rarity, score, pi_native, exact_pct, near_pct,
-        lossy_pct, earth_pct, longest_fossil, dig_site, share_grid, summary,
+        lossy_pct, earth_pct, longest_fossil, dig_site, index_version,
+        index_checksum, searched_digits, indexed_fragments, share_grid, summary,
         artifact_key, card_key, artifact_hash, match_hash, status, views,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         record.id,
@@ -489,6 +571,10 @@ export async function createRelic(
         record.earthPct,
         record.longestFossil,
         record.digSite,
+        record.indexVersion,
+        record.indexChecksum,
+        record.searchedDigits,
+        record.indexedFragments,
         record.shareGrid,
         record.summary,
         record.artifactKey,

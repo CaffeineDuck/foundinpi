@@ -1,0 +1,26 @@
+.dig-site-seg {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dig-site-seg-intro {
+  width: min(560px, 100%);
+  margin: 0 auto 16px;
+}
+
+.dig-site-seg-tools {
+  margin-bottom: 2px;
+}
+
+.dig-site-card {
+  min-height: 72px;
+}
+
+.dig-site-card .mode-top {
+  letter-spacing: 0.08em;
+}
+
+@media (max-width: 460px) {
+  .dig-site-seg {
+    grid-template-columns: 1fr;
+  }
+}
