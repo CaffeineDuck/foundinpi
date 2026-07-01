@@ -5,3 +5,7 @@
 /og-default.png
   Cache-Control: public, max-age=31556952, immutable
   X-Content-Type-Options: nosniff
+
+/og/*
+  Cache-Control: public, max-age=31556952, immutable
+  X-Content-Type-Options: nosniff

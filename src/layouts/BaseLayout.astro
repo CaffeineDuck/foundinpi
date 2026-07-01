@@ -19,7 +19,8 @@ const {
   jsonLd
 } = Astro.props;
 const siteName = "Found in Pi";
-const ogImage = image ?? new URL("/og-default.png", Astro.url.origin).toString();
+const ogImage =
+  image ?? new URL("/og/foundinpi-v2.png", Astro.url.origin).toString();
 ---
 
 <!doctype html>
