@@ -2,12 +2,20 @@ import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-const digits = Number(process.argv[2] ?? 1_000_000);
+const digits = Number(process.argv[2] ?? 10_000_000);
 const fragmentDigits = 32;
 const stride = 7;
+
+function compactDigitsName(count) {
+  if (count % 1_000_000 === 0) return `${count / 1_000_000}m`;
+  if (count % 1_000 === 0) return `${count / 1_000}k`;
+  return String(count);
+}
+
+const version = `pi32-${compactDigitsName(digits)}-v1`;
 const outputPath = resolve(
   process.cwd(),
-  process.argv[3] ?? "public/dig-sites/pi32-1m-v1.bin"
+  process.argv[3] ?? `public/dig-sites/${version}.bin`
 );
 const manifestPath = outputPath.replace(/\.bin$/, ".json");
 const digitsPerTerm = 14.181647462725477;
@@ -109,7 +117,7 @@ writeFileSync(
   manifestPath,
   `${JSON.stringify(
     {
-      version: "pi32-1m-v1",
+      version,
       source: "pi decimal expansion generated with Chudnovsky binary splitting",
       digits,
       fragmentDigits,

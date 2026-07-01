@@ -5,20 +5,18 @@ import {
   DIG_SITE_INDEX_URL
 } from "./constants";
 
-export type PiFragment = {
-  offset: number;
-  rgb: [number, number, number];
-  signature: number[];
-  contrast: number;
-  ink: number;
-  raw: string;
+export type PiCatalogue = {
+  bytes: Uint8Array;
+  fragments: number;
+  rawDigits?: string;
 };
 
-const PACKED_FRAGMENT_BYTES = 11;
+export const PACKED_FRAGMENT_BYTES = 11;
+
 const DEV_FALLBACK_DIGITS = 6144;
 
 let cachedDigits = "";
-let cachedCatalogue: PiFragment[] | null = null;
+let cachedCatalogue: PiCatalogue | null = null;
 
 function arctan(invX: bigint, scale: bigint) {
   const invX2 = invX * invX;
@@ -53,47 +51,6 @@ function getPiDigits(digits = DEV_FALLBACK_DIGITS) {
   return cachedDigits.slice(0, digits);
 }
 
-function statsFor(signature: number[]) {
-  const min = Math.min(...signature);
-  const max = Math.max(...signature);
-  const ink =
-    signature.reduce((total, value) => total + value, 0) / signature.length;
-
-  return {
-    contrast: max - min,
-    ink
-  };
-}
-
-function decodePackedCatalogue(bytes: Uint8Array) {
-  if (bytes.byteLength % PACKED_FRAGMENT_BYTES !== 0) {
-    throw new Error("Dig site index is corrupt");
-  }
-
-  const catalogue: PiFragment[] = [];
-  const total = bytes.byteLength / PACKED_FRAGMENT_BYTES;
-
-  for (let index = 0; index < total; index += 1) {
-    const base = index * PACKED_FRAGMENT_BYTES;
-    const signature: number[] = [];
-
-    for (let packedIndex = 0; packedIndex < 8; packedIndex += 1) {
-      const packed = bytes[base + 3 + packedIndex];
-      signature.push((packed >> 4) & 0x0f, packed & 0x0f);
-    }
-
-    catalogue.push({
-      offset: index * DIG_SITE_FRAGMENT_STRIDE,
-      rgb: [bytes[base], bytes[base + 1], bytes[base + 2]],
-      signature,
-      ...statsFor(signature),
-      raw: ""
-    });
-  }
-
-  return catalogue;
-}
-
 function signatureFor(raw: string) {
   return raw
     .slice(9, 25)
@@ -101,32 +58,52 @@ function signatureFor(raw: string) {
     .map((digit) => Math.round((Number.parseInt(digit, 10) / 9) * 15));
 }
 
-function buildFallbackCatalogue() {
-  const digits = getPiDigits(DEV_FALLBACK_DIGITS);
-  const catalogue: PiFragment[] = [];
+function packFragment(bytes: Uint8Array, fragmentIndex: number, raw: string) {
+  const base = fragmentIndex * PACKED_FRAGMENT_BYTES;
+  bytes[base] = Number.parseInt(raw.slice(0, 3), 10) % 256;
+  bytes[base + 1] = Number.parseInt(raw.slice(3, 6), 10) % 256;
+  bytes[base + 2] = Number.parseInt(raw.slice(6, 9), 10) % 256;
 
-  for (
-    let offset = 0;
-    offset + DIG_SITE_FRAGMENT_DIGITS <= digits.length;
-    offset += DIG_SITE_FRAGMENT_STRIDE
-  ) {
-    const raw = digits.slice(offset, offset + DIG_SITE_FRAGMENT_DIGITS);
-    const signature = signatureFor(raw);
+  const signature = signatureFor(raw);
+  for (let sigIndex = 0; sigIndex < 8; sigIndex += 1) {
+    bytes[base + 3 + sigIndex] =
+      ((signature[sigIndex * 2] & 0x0f) << 4) |
+      (signature[sigIndex * 2 + 1] & 0x0f);
+  }
+}
 
-    catalogue.push({
-      offset,
-      rgb: [
-        Number.parseInt(raw.slice(0, 3), 10) % 256,
-        Number.parseInt(raw.slice(3, 6), 10) % 256,
-        Number.parseInt(raw.slice(6, 9), 10) % 256
-      ],
-      signature,
-      ...statsFor(signature),
-      raw
-    });
+function validatePackedCatalogue(bytes: Uint8Array) {
+  if (bytes.byteLength % PACKED_FRAGMENT_BYTES !== 0) {
+    throw new Error("Dig site index is corrupt");
   }
 
-  return catalogue;
+  return {
+    bytes,
+    fragments: bytes.byteLength / PACKED_FRAGMENT_BYTES
+  } satisfies PiCatalogue;
+}
+
+function buildFallbackCatalogue() {
+  const digits = getPiDigits(DEV_FALLBACK_DIGITS);
+  const fragments =
+    Math.floor((digits.length - DIG_SITE_FRAGMENT_DIGITS) / DIG_SITE_FRAGMENT_STRIDE) +
+    1;
+  const bytes = new Uint8Array(fragments * PACKED_FRAGMENT_BYTES);
+
+  for (let fragmentIndex = 0; fragmentIndex < fragments; fragmentIndex += 1) {
+    const offset = fragmentIndex * DIG_SITE_FRAGMENT_STRIDE;
+    packFragment(
+      bytes,
+      fragmentIndex,
+      digits.slice(offset, offset + DIG_SITE_FRAGMENT_DIGITS)
+    );
+  }
+
+  return {
+    bytes,
+    fragments,
+    rawDigits: digits
+  } satisfies PiCatalogue;
 }
 
 export async function getPiCatalogue() {
@@ -138,7 +115,7 @@ export async function getPiCatalogue() {
       throw new Error(`Unable to load dig site index: ${response.status}`);
     }
 
-    cachedCatalogue = decodePackedCatalogue(
+    cachedCatalogue = validatePackedCatalogue(
       new Uint8Array(await response.arrayBuffer())
     );
   } catch {

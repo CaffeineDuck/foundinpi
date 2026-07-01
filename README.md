@@ -31,14 +31,14 @@ Found in Pi is playful, not fake science.
 - Original pixels are used for matching only; the relic image is rendered from
   pi-derived fragments and reconstruction classes.
 
-The current dig site is `pi32-1m-v1`:
+The current dig site is `pi32-10m-v1`:
 
-- First `1,000,000` decimal digits of pi.
+- First `10,000,000` decimal digits of pi.
 - Overlapping `32`-digit visual fragments.
 - `7`-digit stride.
-- `142,853` indexed fragments.
-- Packed index: `public/dig-sites/pi32-1m-v1.bin`.
-- SHA-256: `555ee7260f240b7a6808aafcaac31d1ace809b3d8e55da4245f6a92c3974fe66`.
+- `1,428,567` indexed fragments.
+- Packed index: `public/dig-sites/pi32-10m-v1.bin`.
+- SHA-256: `ea6785ba281de9ae879fa730ba70662d729d1dd5600d12de7d1734315b0f5359`.
 
 ## Stack
 

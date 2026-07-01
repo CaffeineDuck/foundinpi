@@ -1,7 +1,16 @@
 /// <reference lib="webworker" />
 
-import { TILE_CLASS_COLORS } from "./constants";
-import { getDigSiteStats, getPiCatalogue, type PiFragment } from "./pi";
+import {
+  DIG_SITE_FRAGMENT_DIGITS,
+  DIG_SITE_FRAGMENT_STRIDE,
+  TILE_CLASS_COLORS
+} from "./constants";
+import {
+  getDigSiteStats,
+  getPiCatalogue,
+  PACKED_FRAGMENT_BYTES,
+  type PiCatalogue
+} from "./pi";
 import { summarizeTiles } from "./scoring";
 import type {
   ExcavationMode,
@@ -20,11 +29,25 @@ const COLOR_SEARCH_RADIUS = 1;
 const COLOR_FALLBACK_RADIUS = 2;
 
 type PiSearchIndex = {
-  catalogue: PiFragment[];
-  colorBuckets: number[][];
-  signatureBuckets: number[][];
+  catalogue: PiCatalogue;
+  colorBucketStarts: Uint32Array;
+  colorBucketItems: Uint32Array;
+  signatureBucketStarts: Uint32Array;
+  signatureBucketItems: Uint32Array;
+  contrast: Uint8Array;
+  inkSum: Uint8Array;
   seen: Uint32Array;
   seenMark: number;
+};
+
+type PiFragmentView = {
+  index: number;
+  offset: number;
+  rgb: [number, number, number];
+  signature: number[];
+  contrast: number;
+  ink: number;
+  raw: string;
 };
 
 let cachedSearchIndex: PiSearchIndex | null = null;
@@ -69,7 +92,7 @@ function mixColor(
 
 function piFragmentColor(
   mode: ExcavationMode,
-  fragment: PiFragment,
+  fragment: PiFragmentView,
   className: TileClass,
   localX: number,
   localY: number,
@@ -164,19 +187,96 @@ function heatmapColor(className: TileClass) {
   return [rgb[0], rgb[1], rgb[2], className === "earth" ? 124 : 156];
 }
 
-function signatureDistance(a: number[], b: number[]) {
-  let distance = 0;
-  for (let index = 0; index < 16; index += 1) {
-    distance += Math.abs((a[index] ?? 0) - (b[index] ?? 0));
-  }
-  return distance / 16;
+function fragmentBase(index: number) {
+  return index * PACKED_FRAGMENT_BYTES;
 }
 
-function colorBucketKey(color: [number, number, number]) {
+function signatureValue(catalogue: PiCatalogue, fragmentIndex: number, index: number) {
+  const packed =
+    catalogue.bytes[fragmentBase(fragmentIndex) + 3 + (index >> 1)];
+  return index % 2 === 0 ? (packed >> 4) & 0x0f : packed & 0x0f;
+}
+
+function signatureArray(catalogue: PiCatalogue, fragmentIndex: number) {
+  const signature: number[] = [];
+
+  for (let index = 0; index < 16; index += 1) {
+    signature.push(signatureValue(catalogue, fragmentIndex, index));
+  }
+
+  return signature;
+}
+
+function fragmentRgb(catalogue: PiCatalogue, fragmentIndex: number) {
+  const base = fragmentBase(fragmentIndex);
+  return [
+    catalogue.bytes[base],
+    catalogue.bytes[base + 1],
+    catalogue.bytes[base + 2]
+  ] satisfies [number, number, number];
+}
+
+function fragmentStats(catalogue: PiCatalogue, fragmentIndex: number) {
+  let min = 15;
+  let max = 0;
+  let sum = 0;
+
+  for (let index = 0; index < 16; index += 1) {
+    const value = signatureValue(catalogue, fragmentIndex, index);
+    min = Math.min(min, value);
+    max = Math.max(max, value);
+    sum += value;
+  }
+
+  return {
+    contrast: max - min,
+    inkSum: sum
+  };
+}
+
+function signatureDistanceSum(
+  catalogue: PiCatalogue,
+  fragmentIndex: number,
+  signature: number[]
+) {
+  let distance = 0;
+
+  for (let index = 0; index < 16; index += 1) {
+    distance += Math.abs(
+      (signature[index] ?? 0) - signatureValue(catalogue, fragmentIndex, index)
+    );
+  }
+
+  return distance;
+}
+
+function fragmentView(
+  catalogue: PiCatalogue,
+  fragmentIndex: number,
+  contrast: number,
+  inkSum: number
+) {
+  const offset = fragmentIndex * DIG_SITE_FRAGMENT_STRIDE;
+
+  return {
+    index: fragmentIndex,
+    offset,
+    rgb: fragmentRgb(catalogue, fragmentIndex),
+    signature: signatureArray(catalogue, fragmentIndex),
+    contrast,
+    ink: inkSum / 16,
+    raw: catalogue.rawDigits
+      ? catalogue.rawDigits.slice(offset, offset + DIG_SITE_FRAGMENT_DIGITS)
+      : ""
+  } satisfies PiFragmentView;
+}
+
+function colorBucketKeyForFragment(catalogue: PiCatalogue, fragmentIndex: number) {
+  const base = fragmentBase(fragmentIndex);
   return (
-    ((color[0] >> 4) << 8) |
-    ((color[1] >> 4) << 4) |
-    (color[2] >> 4)
+    ((catalogue.bytes[base] >> 4) << 8) |
+    ((catalogue.bytes[base + 1] >> 4) << 4) |
+    (catalogue.bytes[base + 2] >> 4)
   );
 }
 
@@ -198,26 +298,77 @@ function signatureBucketKey(signature: number[]) {
   );
 }
 
-function buildSearchIndex(catalogue: PiFragment[]) {
-  const colorBuckets = Array.from(
-    { length: COLOR_BUCKET_STEPS ** 3 },
-    () => [] as number[]
+function signatureBucketKeyForFragment(
+  catalogue: PiCatalogue,
+  fragmentIndex: number
+) {
+  const topLeft = signatureValue(catalogue, fragmentIndex, 0) >> 2;
+  const topRight = signatureValue(catalogue, fragmentIndex, 3) >> 2;
+  const bottomLeft = signatureValue(catalogue, fragmentIndex, 12) >> 2;
+  const bottomRight = signatureValue(catalogue, fragmentIndex, 15) >> 2;
+
+  return (
+    (topLeft << 6) |
+    (topRight << 4) |
+    (bottomLeft << 2) |
+    bottomRight
   );
-  const signatureBuckets = Array.from(
-    { length: SIGNATURE_BUCKETS },
-    () => [] as number[]
+}
+
+function startsFromCounts(counts: Uint32Array) {
+  const starts = new Uint32Array(counts.length + 1);
+
+  for (let index = 0; index < counts.length; index += 1) {
+    starts[index + 1] = starts[index] + counts[index];
+  }
+
+  return starts;
+}
+
+function buildSearchIndex(catalogue: PiCatalogue) {
+  const colorCounts = new Uint32Array(COLOR_BUCKET_STEPS ** 3);
+  const signatureCounts = new Uint32Array(SIGNATURE_BUCKETS);
+  const contrast = new Uint8Array(catalogue.fragments);
+  const inkSum = new Uint8Array(catalogue.fragments);
+
+  for (let index = 0; index < catalogue.fragments; index += 1) {
+    colorCounts[colorBucketKeyForFragment(catalogue, index)] += 1;
+    signatureCounts[signatureBucketKeyForFragment(catalogue, index)] += 1;
+
+    const stats = fragmentStats(catalogue, index);
+    contrast[index] = stats.contrast;
+    inkSum[index] = stats.inkSum;
+  }
+
+  const colorBucketStarts = startsFromCounts(colorCounts);
+  const signatureBucketStarts = startsFromCounts(signatureCounts);
+  const colorBucketItems = new Uint32Array(catalogue.fragments);
+  const signatureBucketItems = new Uint32Array(catalogue.fragments);
+  const colorCursor = new Uint32Array(
+    colorBucketStarts.subarray(0, colorCounts.length)
+  );
+  const signatureCursor = new Uint32Array(
+    signatureBucketStarts.subarray(0, signatureCounts.length)
   );
 
-  catalogue.forEach((fragment, index) => {
-    colorBuckets[colorBucketKey(fragment.rgb)].push(index);
-    signatureBuckets[signatureBucketKey(fragment.signature)].push(index);
-  });
+  for (let index = 0; index < catalogue.fragments; index += 1) {
+    const colorKey = colorBucketKeyForFragment(catalogue, index);
+    const signatureKey = signatureBucketKeyForFragment(catalogue, index);
+    colorBucketItems[colorCursor[colorKey]] = index;
+    colorCursor[colorKey] += 1;
+    signatureBucketItems[signatureCursor[signatureKey]] = index;
+    signatureCursor[signatureKey] += 1;
+  }
 
   return {
     catalogue,
-    colorBuckets,
-    signatureBuckets,
-    seen: new Uint32Array(catalogue.length),
+    colorBucketStarts,
+    colorBucketItems,
+    signatureBucketStarts,
+    signatureBucketItems,
+    contrast,
+    inkSum,
+    seen: new Uint32Array(catalogue.fragments),
     seenMark: 0
   } satisfies PiSearchIndex;
 }
@@ -236,8 +387,17 @@ function findNearestPiFragment(
   signature: number[],
   searchIndex: PiSearchIndex
 ) {
-  const { catalogue, colorBuckets, signatureBuckets, seen } = searchIndex;
-  let best = catalogue[0];
+  const {
+    catalogue,
+    colorBucketStarts,
+    colorBucketItems,
+    signatureBucketStarts,
+    signatureBucketItems,
+    contrast,
+    inkSum,
+    seen
+  } = searchIndex;
+  let bestIndex = 0;
   let bestDistance = Number.POSITIVE_INFINITY;
   let bestColorDistance = Number.POSITIVE_INFINITY;
   let exactSignature = false;
@@ -251,33 +411,35 @@ function findNearestPiFragment(
 
   const seenMark = searchIndex.seenMark;
   const sourceContrast = Math.max(...signature) - Math.min(...signature);
-  const sourceInk =
-    signature.reduce((total, value) => total + value, 0) / signature.length;
+  const sourceInkSum = signature.reduce((total, value) => total + value, 0);
 
   function consider(candidateIndex: number) {
     if (seen[candidateIndex] === seenMark) return;
     seen[candidateIndex] = seenMark;
     candidateCount += 1;
 
-    const candidate = catalogue[candidateIndex];
-    const candidateColorDistance = colorDistance(color, candidate.rgb);
-    const candidateSignatureDistance = signatureDistance(
-      signature,
-      candidate.signature
+    const candidateColorDistance = colorDistance(
+      color,
+      fragmentRgb(catalogue, candidateIndex)
     );
-    const contrastDistance = Math.abs(sourceContrast - candidate.contrast);
-    const inkDistance = Math.abs(sourceInk - candidate.ink);
+    const candidateSignatureDistanceSum = signatureDistanceSum(
+      catalogue,
+      candidateIndex,
+      signature
+    );
+    const contrastDistance = Math.abs(sourceContrast - contrast[candidateIndex]);
+    const inkDistance = Math.abs(sourceInkSum - inkSum[candidateIndex]) / 16;
     const distance =
       candidateColorDistance * 0.08 +
-      candidateSignatureDistance * 7.4 +
+      (candidateSignatureDistanceSum / 16) * 7.4 +
       contrastDistance * 2.2 +
       inkDistance * 1.3;
 
     if (distance < bestDistance) {
-      best = candidate;
+      bestIndex = candidateIndex;
       bestDistance = distance;
       bestColorDistance = candidateColorDistance;
-      exactSignature = candidateSignatureDistance === 0;
+      exactSignature = candidateSignatureDistanceSum === 0;
     }
   }
 
@@ -301,8 +463,13 @@ function findNearestPiFragment(
           b <= Math.min(COLOR_BUCKET_MASK, bBucket + radius);
           b += 1
         ) {
-          const bucket = colorBuckets[colorBucketKeyFromBins(r, g, b)];
-          for (const candidateIndex of bucket) consider(candidateIndex);
+          const bucketKey = colorBucketKeyFromBins(r, g, b);
+          const start = colorBucketStarts[bucketKey];
+          const end = colorBucketStarts[bucketKey + 1];
+
+          for (let itemIndex = start; itemIndex < end; itemIndex += 1) {
+            consider(colorBucketItems[itemIndex]);
+          }
         }
       }
     }
@@ -310,14 +477,32 @@ function findNearestPiFragment(
 
   searchColorBuckets(COLOR_SEARCH_RADIUS);
 
-  const signatureBucket = signatureBuckets[signatureBucketKey(signature)];
-  for (const candidateIndex of signatureBucket) consider(candidateIndex);
+  const signatureKey = signatureBucketKey(signature);
+  const signatureStart = signatureBucketStarts[signatureKey];
+  const signatureEnd = signatureBucketStarts[signatureKey + 1];
+  for (
+    let itemIndex = signatureStart;
+    itemIndex < signatureEnd;
+    itemIndex += 1
+  ) {
+    consider(signatureBucketItems[itemIndex]);
+  }
 
   if (candidateCount < MIN_COLOR_CANDIDATES) {
     searchColorBuckets(COLOR_FALLBACK_RADIUS);
   }
 
-  return { best, bestDistance, bestColorDistance, exactSignature };
+  return {
+    best: fragmentView(
+      catalogue,
+      bestIndex,
+      contrast[bestIndex],
+      inkSum[bestIndex]
+    ),
+    bestDistance,
+    bestColorDistance,
+    exactSignature
+  };
 }
 
 async function processImage(request: WorkerRequest) {
@@ -329,7 +514,7 @@ async function processImage(request: WorkerRequest) {
   });
 
   const searchIndex = await getPiSearchIndex();
-  const stats = getDigSiteStats(searchIndex.catalogue.length);
+  const stats = getDigSiteStats(searchIndex.catalogue.fragments);
   const source = new Uint8ClampedArray(request.imageBuffer);
   const relic = new Uint8ClampedArray(source.length);
   const heatmap = new Uint8ClampedArray(source.length);

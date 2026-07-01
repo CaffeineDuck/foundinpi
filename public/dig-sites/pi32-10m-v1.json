@@ -1,0 +1,11 @@
+{
+  "version": "pi32-10m-v1",
+  "source": "pi decimal expansion generated with Chudnovsky binary splitting",
+  "digits": 10000000,
+  "fragmentDigits": 32,
+  "stride": 7,
+  "fragments": 1428567,
+  "bytesPerFragment": 11,
+  "byteLength": 15714237,
+  "sha256": "ea6785ba281de9ae879fa730ba70662d729d1dd5600d12de7d1734315b0f5359"
+}

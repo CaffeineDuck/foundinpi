@@ -1109,9 +1109,9 @@ export default function ExcavationApp() {
                 <p className="live-label">{progressLabel}</p>
                 <ul className="field-log">
                   <li>
-                    Opening index <b>pi32-1m-v1</b>
+                    Opening index <b>pi32-10m-v1</b>
                   </li>
-                  <li>Reading 1,000,000 π digits</li>
+                  <li>Reading 10,000,000 π digits</li>
                   <li>Matching 32-digit windows</li>
                   <li>Classifying recovered tiles</li>
                 </ul>
