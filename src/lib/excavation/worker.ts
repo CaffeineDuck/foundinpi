@@ -28,6 +28,10 @@ const SIGNATURE_BUCKETS = 256;
 const MIN_COLOR_CANDIDATES = 160;
 const COLOR_SEARCH_RADIUS = 1;
 const COLOR_FALLBACK_RADIUS = 2;
+const EXACT_DISTANCE_THRESHOLD = 27;
+const EXACT_MIN_SOURCE_CONTRAST = 2;
+const NEAR_DISTANCE_THRESHOLD = 34;
+const LOSSY_DISTANCE_THRESHOLD = 42;
 
 type PiSearchIndex = {
   catalogue: PiCatalogue;
@@ -69,10 +73,23 @@ function fragmentColorDistance(
   return Math.sqrt(dr * dr + dg * dg + db * db);
 }
 
-function classify(distance: number, exactSignature: boolean): TileClass {
+function classify(
+  distance: number,
+  exactSignature: boolean,
+  sourceSignature: number[]
+): TileClass {
+  const sourceContrast =
+    Math.max(...sourceSignature) - Math.min(...sourceSignature);
+
   if (exactSignature && distance <= 22) return "exact";
-  if (distance <= 34) return "near";
-  if (distance <= 52) return "lossy";
+  if (
+    sourceContrast >= EXACT_MIN_SOURCE_CONTRAST &&
+    distance <= EXACT_DISTANCE_THRESHOLD
+  ) {
+    return "exact";
+  }
+  if (distance <= NEAR_DISTANCE_THRESHOLD) return "near";
+  if (distance <= LOSSY_DISTANCE_THRESHOLD) return "lossy";
   return "earth";
 }
 
@@ -580,7 +597,7 @@ async function processImage(request: WorkerRequest) {
       const { best, bestDistance, bestColorDistance, exactSignature } =
         findNearestPiFragment(average, sourceSignature, searchIndex);
       const isExact = exactSignature && bestColorDistance <= 48;
-      const className = classify(bestDistance, isExact);
+      const className = classify(bestDistance, isExact, sourceSignature);
       const recovered = best.rgb;
       const heat = heatmapColor(className);
 
