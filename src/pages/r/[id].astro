@@ -74,12 +74,18 @@ const catalogDate = createdDate
   ? `${MONTHS[createdDate.getUTCMonth()]} ${createdDate.getUTCFullYear()}`
   : "";
 const catalogNo = relic ? `FIP-${relic.id}` : "";
+const CLASS_TIP = {
+  exact: "Found in pi exactly as-is — a perfect match.",
+  near: "Almost in pi — nudged a little to fit.",
+  lossy: "Rebuilt from pi to roughly resemble the original.",
+  earth: "Not in pi at all — kept from your original photo."
+};
 const breakdown = relic
   ? [
-      { k: "exact", label: "Exact Pi", pct: relic.exactPct },
-      { k: "near", label: "Near Pi", pct: relic.nearPct },
-      { k: "lossy", label: "Lossy Pi", pct: relic.lossyPct },
-      { k: "earth", label: "Earth Bytes", pct: relic.earthPct }
+      { k: "exact", label: "Exact Pi", pct: relic.exactPct, tip: CLASS_TIP.exact },
+      { k: "near", label: "Near Pi", pct: relic.nearPct, tip: CLASS_TIP.near },
+      { k: "lossy", label: "Lossy Pi", pct: relic.lossyPct, tip: CLASS_TIP.lossy },
+      { k: "earth", label: "Earth Bytes", pct: relic.earthPct, tip: CLASS_TIP.earth }
     ]
   : [];
 
@@ -231,8 +237,17 @@ const jsonLd = relic
 
             <div class="breakdown">
               {breakdown.map((entry) => (
-                <div class="bar" data-k={entry.k}>
-                  <span class="bar-label">{entry.label}</span>
+                <div
+                  class="bar"
+                  data-k={entry.k}
+                  data-tip={entry.tip}
+                  tabindex="0"
+                  aria-label={`${entry.label}: ${entry.tip}`}
+                >
+                  <span class="bar-label">
+                    {entry.label}
+                    <svg class="bar-info" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                  </span>
                   <span class="bar-track">
                     <span class="bar-fill" style={`width:${entry.pct}%`} />
                   </span>

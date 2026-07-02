@@ -124,6 +124,14 @@ const BREAKDOWN: ReadonlyArray<{ k: TileClass; label: string }> = [
   { k: "earth", label: "Earth Bytes" }
 ];
 
+// plain-language explanation of each match type (used in tooltips)
+const CLASS_TIP: Record<TileClass, string> = {
+  exact: "Found in pi exactly as-is — a perfect match.",
+  near: "Almost in pi — nudged a little to fit.",
+  lossy: "Rebuilt from pi to roughly resemble the original.",
+  earth: "Not in pi at all — kept from your original photo."
+};
+
 function isDigSiteId(value: string | null): value is DigSiteId {
   return DIG_SITES.some((site) => site.id === value);
 }
@@ -587,34 +595,35 @@ export default function ExcavationApp() {
 
   function digSiteSelector(className = "") {
     return (
-      <div
-        className={`mode-seg dig-site-seg ${className}`.trim()}
-        role="group"
-        aria-label="Pi dig site"
-      >
-        {DIG_SITES.map((site) => (
-          <button
-            key={site.id}
-            className={
-              site.id === digSiteId
-                ? "mode-card dig-site-card active"
-                : "mode-card dig-site-card"
-            }
-            type="button"
-            disabled={isWorking}
-            aria-pressed={site.id === digSiteId}
-            title={`${site.indexVersion} · ${site.digits.toLocaleString()} digits`}
-            onClick={() => chooseDigSite(site.id)}
-          >
-            <span className="mode-top">
-              <Pickaxe size={15} aria-hidden="true" />
-              {site.shortLabel}
-            </span>
-            <em>
-              {site.depthLabel} · {site.note}
-            </em>
-          </button>
-        ))}
+      <div className="tool-group">
+        <span className="tool-group-label">Dig depth — how much of π to search</span>
+        <div
+          className={`mode-seg dig-site-seg ${className}`.trim()}
+          role="group"
+          aria-label="How deep to dig into pi"
+        >
+          {DIG_SITES.map((site) => (
+            <button
+              key={site.id}
+              className={
+                site.id === digSiteId
+                  ? "mode-card dig-site-card active"
+                  : "mode-card dig-site-card"
+              }
+              type="button"
+              disabled={isWorking}
+              aria-pressed={site.id === digSiteId}
+              title={`Search the first ${site.digits.toLocaleString()} digits of pi`}
+              onClick={() => chooseDigSite(site.id)}
+            >
+              <span className="mode-top">
+                <Pickaxe size={15} aria-hidden="true" />
+                {site.depthLabel}
+              </span>
+              <em>{site.note}</em>
+            </button>
+          ))}
+        </div>
       </div>
     );
   }
@@ -942,20 +951,17 @@ export default function ExcavationApp() {
             ))}
           </div>
 
-          <p className="intro-eyebrow">
-            Image archaeology — {activeDigSite.shortLabel}
-          </p>
+          <p className="intro-eyebrow">An internet toy</p>
           <h1 className="intro-title">
             Drop an image.
             <br />
             We&rsquo;ll dig it out of <span className="pi-glyph">π</span>.
           </h1>
           <p className="intro-sub">
-            Upload a photo and we excavate it from a finite region of pi, then
-            hand you a shareable relic with a rarity score.
+            The digits of pi run on forever and never repeat, so little pieces
+            of any picture are already hiding inside them. Drop a photo and
+            we&rsquo;ll dig yours back out.
           </p>
-
-          {digSiteSelector("dig-site-seg-intro")}
 
           <label
             className="drop-hero"
@@ -998,36 +1004,13 @@ export default function ExcavationApp() {
               onClick={excavateSample}
             >
               <Pickaxe size={15} aria-hidden="true" />
-              or excavate a sample specimen
+              or try an example
             </button>
           </div>
 
-          <ul className="class-legend" aria-label="Classification key">
-            <li data-k="exact">
-              <i aria-hidden="true" />
-              <span>Exact Pi</span>
-              <em>found in π</em>
-            </li>
-            <li data-k="near">
-              <i aria-hidden="true" />
-              <span>Near Pi</span>
-              <em>restored</em>
-            </li>
-            <li data-k="lossy">
-              <i aria-hidden="true" />
-              <span>Lossy Pi</span>
-              <em>pi-derived</em>
-            </li>
-            <li data-k="earth">
-              <i aria-hidden="true" />
-              <span>Earth Bytes</span>
-              <em>not from π</em>
-            </li>
-          </ul>
-
           <p className="intro-honesty">
-            We have not searched all of pi. No one has. Scores are excavation
-            scores, not compression claims.
+            We only dig through the first million digits of pi, not all of it
+            (nobody can). It&rsquo;s a toy, not real compression.
           </p>
         </section>
       ) : (
@@ -1116,7 +1099,9 @@ export default function ExcavationApp() {
             <div className="stage-tools">
               {digSiteSelector("dig-site-seg-tools")}
 
-              <div className="mode-seg" role="group" aria-label="Reconstruction mode">
+              <div className="tool-group">
+                <span className="tool-group-label">Style — how the dug-up image looks</span>
+                <div className="mode-seg" role="group" aria-label="Reconstruction style">
                 {MODES_IN_ORDER.map((entry) => {
                   const Icon = MODE_ICON[entry];
                   return (
@@ -1145,6 +1130,7 @@ export default function ExcavationApp() {
                     </button>
                   );
                 })}
+                </div>
               </div>
 
               <div className="stage-tool-row">
@@ -1246,8 +1232,18 @@ export default function ExcavationApp() {
                             ? result.summary.lossyPct
                             : result.summary.earthPct;
                     return (
-                      <div className="bar" key={k} data-k={k}>
-                        <span className="bar-label">{label}</span>
+                      <div
+                        className="bar"
+                        key={k}
+                        data-k={k}
+                        data-tip={CLASS_TIP[k]}
+                        tabIndex={0}
+                        aria-label={`${label}: ${CLASS_TIP[k]}`}
+                      >
+                        <span className="bar-label">
+                          {label}
+                          <Info className="bar-info" size={12} aria-hidden="true" />
+                        </span>
                         <span className="bar-track">
                           <span
                             className="bar-fill"
