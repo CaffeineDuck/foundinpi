@@ -37,6 +37,7 @@ export type ExcavationSummary = {
   digSite: string;
   indexedFragments: number;
   searchedDigits: number;
+  digitUnit: string;
   indexVersion: string;
   indexChecksum: string;
   shareGrid: string;

@@ -20,7 +20,7 @@ export const PACKED_FRAGMENT_BYTES = DIG_SITE_INDEX_BYTES_V2;
 
 const DEV_FALLBACK_DIGITS = 6144;
 
-let cachedDigits = "";
+const cachedDigits = new Map<DigSite["radix"], string>();
 const cachedCatalogues = new Map<DigSiteId, PiCatalogue>();
 
 function arctan(invX: bigint, scale: bigint) {
@@ -42,21 +42,52 @@ function arctan(invX: bigint, scale: bigint) {
   return sum;
 }
 
-function getPiDigits(digits = DEV_FALLBACK_DIGITS) {
-  if (cachedDigits.length >= digits) {
-    return cachedDigits.slice(0, digits);
+function getPiDigits(
+  digits = DEV_FALLBACK_DIGITS,
+  radix: DigSite["radix"] = "decimal"
+) {
+  const cached = cachedDigits.get(radix) ?? "";
+  if (cached.length >= digits) {
+    return cached.slice(0, digits);
   }
 
   const guardDigits = 12;
-  const scale = 10n ** BigInt(digits + guardDigits);
+  const base = radix === "hexadecimal" ? 16 : 10;
+  const scale = BigInt(base) ** BigInt(digits + guardDigits);
   const piScaled = 16n * arctan(5n, scale) - 4n * arctan(239n, scale);
-  const raw = piScaled.toString().padStart(digits + guardDigits + 1, "0");
-  cachedDigits = raw.slice(1, digits + 1);
+  const raw = piScaled
+    .toString(base)
+    .padStart(digits + guardDigits + 1, "0");
+  const computed = raw.slice(1, digits + 1).toUpperCase();
+  cachedDigits.set(radix, computed);
 
-  return cachedDigits.slice(0, digits);
+  return computed.slice(0, digits);
 }
 
-function signatureFor(raw: string) {
+function colorFor(raw: string, radix: DigSite["radix"]) {
+  if (radix === "hexadecimal") {
+    return [
+      Number.parseInt(raw.slice(0, 2), 16),
+      Number.parseInt(raw.slice(2, 4), 16),
+      Number.parseInt(raw.slice(4, 6), 16)
+    ] satisfies [number, number, number];
+  }
+
+  return [
+    Number.parseInt(raw.slice(0, 3), 10) % 256,
+    Number.parseInt(raw.slice(3, 6), 10) % 256,
+    Number.parseInt(raw.slice(6, 9), 10) % 256
+  ] satisfies [number, number, number];
+}
+
+function signatureFor(raw: string, radix: DigSite["radix"]) {
+  if (radix === "hexadecimal") {
+    return raw
+      .slice(6, 22)
+      .split("")
+      .map((digit) => Number.parseInt(digit, 16));
+  }
+
   return raw
     .slice(9, 25)
     .split("")
@@ -131,18 +162,19 @@ function signatureStats(signature: number[]) {
   };
 }
 
-function packFragment(bytes: Uint8Array, fragmentIndex: number, raw: string) {
+function packFragment(
+  bytes: Uint8Array,
+  fragmentIndex: number,
+  raw: string,
+  radix: DigSite["radix"]
+) {
   const base = fragmentIndex * PACKED_FRAGMENT_BYTES;
-  const color = [
-    Number.parseInt(raw.slice(0, 3), 10) % 256,
-    Number.parseInt(raw.slice(3, 6), 10) % 256,
-    Number.parseInt(raw.slice(6, 9), 10) % 256
-  ] satisfies [number, number, number];
+  const color = colorFor(raw, radix);
   bytes[base] = color[0];
   bytes[base + 1] = color[1];
   bytes[base + 2] = color[2];
 
-  const signature = signatureFor(raw);
+  const signature = signatureFor(raw, radix);
   for (let sigIndex = 0; sigIndex < 8; sigIndex += 1) {
     bytes[base + 3 + sigIndex] =
       ((signature[sigIndex * 2] & 0x0f) << 4) |
@@ -173,7 +205,7 @@ function validatePackedCatalogue(bytes: Uint8Array, digSite: DigSite) {
 }
 
 function buildFallbackCatalogue(digSite: DigSite) {
-  const digits = getPiDigits(DEV_FALLBACK_DIGITS);
+  const digits = getPiDigits(DEV_FALLBACK_DIGITS, digSite.radix);
   const fragments =
     Math.floor((digits.length - DIG_SITE_FRAGMENT_DIGITS) / DIG_SITE_FRAGMENT_STRIDE) +
     1;
@@ -184,7 +216,8 @@ function buildFallbackCatalogue(digSite: DigSite) {
     packFragment(
       bytes,
       fragmentIndex,
-      digits.slice(offset, offset + DIG_SITE_FRAGMENT_DIGITS)
+      digits.slice(offset, offset + DIG_SITE_FRAGMENT_DIGITS),
+      digSite.radix
     );
   }
 

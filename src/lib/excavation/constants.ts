@@ -18,6 +18,9 @@ export const DIG_SITES = [
       "c6d1a62658f9093c4838161dea39e6cde773f9932960dc7ca49f29807734f764",
     packedFragmentBytes: DIG_SITE_INDEX_BYTES_V2,
     digits: 1_000_000,
+    radix: "decimal",
+    digitUnit: "decimal digits",
+    coordinatePrefix: "π",
     indexedFragments: 142_853,
     depthLabel: "1M digits",
     note: "Patch match"
@@ -33,9 +36,30 @@ export const DIG_SITES = [
       "97a5b7c13ead425c059825d7ed57b716840db6043ea39c8142873536da3c0459",
     packedFragmentBytes: DIG_SITE_INDEX_BYTES_V2,
     digits: 10_000_000,
+    radix: "decimal",
+    digitUnit: "decimal digits",
+    coordinatePrefix: "π",
     indexedFragments: 1_428_567,
     depthLabel: "10M digits",
     note: "Deeper patch match"
+  },
+  {
+    id: "dig-site-iii",
+    shortLabel: "Dig Site III",
+    label:
+      "Dig Site III: first 1,000,000 hexadecimal digits of pi, indexed as hex-native patch descriptors",
+    indexVersion: "pi16-1m-v1",
+    indexUrl: "/dig-sites/pi16-1m-v1.bin",
+    indexChecksum:
+      "c722223998b854819b8f093e7cf5432689066ab6d2e8af6a08258ec9c23d5040",
+    packedFragmentBytes: DIG_SITE_INDEX_BYTES_V2,
+    digits: 1_000_000,
+    radix: "hexadecimal",
+    digitUnit: "hex digits",
+    coordinatePrefix: "π16",
+    indexedFragments: 142_853,
+    depthLabel: "1M hex",
+    note: "Hex Field"
   }
 ] as const;
 
@@ -55,6 +79,9 @@ export const DIG_SITE_HISTORY = [
       "555ee7260f240b7a6808aafcaac31d1ace809b3d8e55da4245f6a92c3974fe66",
     packedFragmentBytes: DIG_SITE_INDEX_BYTES_V1,
     digits: 1_000_000,
+    radix: "decimal",
+    digitUnit: "decimal digits",
+    coordinatePrefix: "π",
     indexedFragments: 142_853,
     depthLabel: "1M digits",
     note: "Legacy visual fragments"
@@ -70,6 +97,9 @@ export const DIG_SITE_HISTORY = [
       "ea6785ba281de9ae879fa730ba70662d729d1dd5600d12de7d1734315b0f5359",
     packedFragmentBytes: DIG_SITE_INDEX_BYTES_V1,
     digits: 10_000_000,
+    radix: "decimal",
+    digitUnit: "decimal digits",
+    coordinatePrefix: "π",
     indexedFragments: 1_428_567,
     depthLabel: "10M digits",
     note: "Legacy visual fragments"

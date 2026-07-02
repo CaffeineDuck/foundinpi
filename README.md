@@ -31,25 +31,34 @@ Found in Pi is playful, not fake science.
 - Original pixels are used for matching only; the relic image is rendered from
   pi-derived fragments and reconstruction classes.
 
-The app currently ships two finite dig sites:
+The app currently ships three finite dig sites:
 
-**Dig Site I** (`pi32-1m-v1`) is the default:
+**Dig Site I** (`pi32-1m-v2`) is the default:
 
 - First `1,000,000` decimal digits of pi.
-- Overlapping `32`-digit visual fragments.
+- Overlapping `32`-digit v2 patch descriptors.
 - `7`-digit stride.
 - `142,853` indexed fragments.
-- Packed index: `public/dig-sites/pi32-1m-v1.bin`.
-- SHA-256: `555ee7260f240b7a6808aafcaac31d1ace809b3d8e55da4245f6a92c3974fe66`.
+- Packed index: `public/dig-sites/pi32-1m-v2.bin`.
+- SHA-256: `c6d1a62658f9093c4838161dea39e6cde773f9932960dc7ca49f29807734f764`.
 
-**Dig Site II** (`pi32-10m-v1`) is opt-in:
+**Dig Site II** (`pi32-10m-v2`) is opt-in:
 
 - First `10,000,000` decimal digits of pi.
-- Overlapping `32`-digit visual fragments.
+- Overlapping `32`-digit v2 patch descriptors.
 - `7`-digit stride.
 - `1,428,567` indexed fragments.
-- Packed index: `public/dig-sites/pi32-10m-v1.bin`.
-- SHA-256: `ea6785ba281de9ae879fa730ba70662d729d1dd5600d12de7d1734315b0f5359`.
+- Packed index: `public/dig-sites/pi32-10m-v2.bin`.
+- SHA-256: `97a5b7c13ead425c059825d7ed57b716840db6043ea39c8142873536da3c0459`.
+
+**Dig Site III** (`pi16-1m-v1`) is Hex Field:
+
+- First `1,000,000` hexadecimal digits of pi.
+- Overlapping `32`-hex-digit native patch descriptors.
+- `7`-hex-digit stride.
+- `142,853` indexed fragments.
+- Packed index: `public/dig-sites/pi16-1m-v1.bin`.
+- SHA-256: `c722223998b854819b8f093e7cf5432689066ab6d2e8af6a08258ec9c23d5040`.
 
 ## Stack
 

@@ -834,9 +834,9 @@ async function processImage(request: WorkerRequest) {
         height: tileHeight,
         className,
         distance: Math.round(bestDistance * 10) / 10,
-        coordinate: `π:${best.offset.toString().padStart(6, "0")}..${(
-          best.offset + 31
-        )
+        coordinate: `${searchIndex.catalogue.digSite.coordinatePrefix}:${best.offset
+          .toString()
+          .padStart(6, "0")}..${(best.offset + 31)
           .toString()
           .padStart(6, "0")}`,
         source: average,

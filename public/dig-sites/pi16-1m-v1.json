@@ -1,0 +1,13 @@
+{
+  "version": "pi16-1m-v1",
+  "source": "pi hexadecimal expansion generated with Chudnovsky binary splitting",
+  "radix": "hexadecimal",
+  "digits": 1000000,
+  "fragmentDigits": 32,
+  "stride": 7,
+  "fragments": 142853,
+  "bytesPerFragment": 18,
+  "descriptor": "rgb + 4x4 luma + contrast/ink + edge/texture/center patch descriptor",
+  "byteLength": 2571354,
+  "sha256": "c722223998b854819b8f093e7cf5432689066ab6d2e8af6a08258ec9c23d5040"
+}

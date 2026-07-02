@@ -23,9 +23,10 @@
     "cf:d1:migrate:local": "node scripts/with-cloudflare-env.mjs wrangler d1 migrations apply foundinpi --local",
     "cf:d1:migrate:remote": "node scripts/with-cloudflare-env.mjs wrangler d1 migrations apply foundinpi --remote",
     "cf:r2:create": "node scripts/with-cloudflare-env.mjs wrangler r2 bucket create foundinpi-relics",
-    "digsite:build": "npm run digsite:build:1m && npm run digsite:build:10m",
+    "digsite:build": "npm run digsite:build:1m && npm run digsite:build:10m && npm run digsite:build:hex1m",
     "digsite:build:1m": "node scripts/build-dig-site-index.mjs 1000000",
     "digsite:build:10m": "node scripts/build-dig-site-index.mjs 10000000",
+    "digsite:build:hex1m": "node scripts/build-dig-site-index.mjs 1000000 --hex",
     "og:build": "node scripts/build-og-image.mjs"
   },
   "dependencies": {

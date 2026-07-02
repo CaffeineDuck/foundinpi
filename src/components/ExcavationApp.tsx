@@ -359,6 +359,15 @@ ${result.summary.shareGrid}
 ${url}`;
 }
 
+function coordinateParts(coordinate: string) {
+  const match = coordinate.match(/^([^:]+):(.*)$/);
+  if (match) {
+    return { prefix: match[1], rest: match[2] };
+  }
+
+  return { prefix: "π", rest: coordinate.replace(/^π[:\s]*/, "") };
+}
+
 function tileAt(
   tiles: TileExcavation[],
   point: { x: number; y: number } | null
@@ -596,11 +605,11 @@ export default function ExcavationApp() {
   function digSiteSelector(className = "") {
     return (
       <div className="tool-group">
-        <span className="tool-group-label">Dig depth — how much of π to search</span>
+        <span className="tool-group-label">Dig site — which finite π field to search</span>
         <div
           className={`mode-seg dig-site-seg ${className}`.trim()}
           role="group"
-          aria-label="How deep to dig into pi"
+          aria-label="Which finite pi dig site to search"
         >
           {DIG_SITES.map((site) => (
             <button
@@ -613,7 +622,7 @@ export default function ExcavationApp() {
               type="button"
               disabled={isWorking}
               aria-pressed={site.id === digSiteId}
-              title={`Search the first ${site.digits.toLocaleString()} digits of pi`}
+              title={`Search ${site.digits.toLocaleString()} ${site.digitUnit}`}
               onClick={() => chooseDigSite(site.id)}
             >
               <span className="mode-top">
@@ -1006,8 +1015,9 @@ export default function ExcavationApp() {
           </div>
 
           <p className="intro-honesty">
-            We dig through a finite slice of pi: 1M digits by default, or 10M
-            if you choose Dig Site II. It&rsquo;s a toy, not real compression.
+            We dig through finite slices of pi: 1M decimal digits by default,
+            10M decimal digits in Dig Site II, or 1M hex digits in Dig Site III.
+            It&rsquo;s a toy, not real compression.
           </p>
         </section>
       ) : (
@@ -1065,7 +1075,7 @@ export default function ExcavationApp() {
               {activeTile ? (
                 <div className="tile-popover" data-k={activeTile.className}>
                   <strong>{TILE_CLASS_LABELS[activeTile.className]}</strong>
-                  <span>π offset {activeTile.coordinate}</span>
+                  <span>offset {activeTile.coordinate}</span>
                   <small>distance {activeTile.distance}</small>
                 </div>
               ) : null}
@@ -1077,11 +1087,14 @@ export default function ExcavationApp() {
               aria-hidden="true"
             >
               <div className="coord-rail-track">
-                {[...coordItems, ...coordItems].map((item, index) => (
-                  <span key={index}>
-                    <b>π</b> {item.replace(/^π[:\s]*/, "")}
-                  </span>
-                ))}
+                {[...coordItems, ...coordItems].map((item, index) => {
+                  const coordinate = coordinateParts(item);
+                  return (
+                    <span key={index}>
+                      <b>{coordinate.prefix}</b> {coordinate.rest}
+                    </span>
+                  );
+                })}
               </div>
             </div>
 
@@ -1184,9 +1197,16 @@ export default function ExcavationApp() {
                     Opening index <b>{activeDigSite.indexVersion}</b>
                   </li>
                   <li>
-                    Reading {activeDigSite.digits.toLocaleString()} π digits
+                    Reading {activeDigSite.digits.toLocaleString()}{" "}
+                    {activeDigSite.digitUnit}
                   </li>
-                  <li>Matching 32-digit windows</li>
+                  <li>
+                    Matching 32-
+                    {activeDigSite.radix === "hexadecimal"
+                      ? "hex-digit"
+                      : "digit"}{" "}
+                    windows
+                  </li>
                   <li>Classifying recovered tiles</li>
                 </ul>
                 <div className="skeletons" aria-hidden="true">
@@ -1390,8 +1410,9 @@ export default function ExcavationApp() {
                     {result.summary.digSite.split(":")[0]} · {result.summary.indexVersion}
                   </summary>
                   <p>
-                    {result.summary.searchedDigits.toLocaleString()} computed π
-                    digits · {result.summary.indexedFragments.toLocaleString()}{" "}
+                    {result.summary.searchedDigits.toLocaleString()} computed{" "}
+                    {result.summary.digitUnit} ·{" "}
+                    {result.summary.indexedFragments.toLocaleString()}{" "}
                     indexed fragments · checksum{" "}
                     {result.summary.indexChecksum.slice(0, 12)}. Original pixels
                     are used for matching only, never painted into the relic.

@@ -123,6 +123,7 @@ function siteFromLabel(label: string | undefined) {
     clean.includes(site.indexVersion)
   );
   if (byVersion) return byVersion;
+  if (clean.includes("hexadecimal")) return DIG_SITES[2];
   if (clean.includes("10,000,000")) return DIG_SITES[1];
   if (clean.includes("1,000,000")) return DIG_SITES[0];
   return DEFAULT_DIG_SITE;

@@ -220,6 +220,7 @@ export function summarizeTiles(
     digSite: digSite.label,
     indexedFragments,
     searchedDigits,
+    digitUnit: digSite.digitUnit,
     indexVersion: digSite.indexVersion,
     indexChecksum: digSite.indexChecksum,
     shareGrid: buildShareGrid(tiles),

@@ -2,11 +2,16 @@ import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-const digits = Number(process.argv[2] ?? 1_000_000);
+const args = process.argv.slice(2);
+const positionalArgs = args.filter((arg) => !arg.startsWith("--"));
+const digits = Number(positionalArgs[0] ?? 1_000_000);
+const radix = args.includes("--hex") ? "hexadecimal" : "decimal";
 const fragmentDigits = 32;
 const stride = 7;
 const indexMajorVersion = 2;
 const bytesPerFragment = 18;
+const fractionalDigitCount =
+  radix === "hexadecimal" ? Math.ceil(digits * Math.log10(16)) : digits;
 
 function compactDigitsName(count) {
   if (count % 1_000_000 === 0) return `${count / 1_000_000}m`;
@@ -14,14 +19,17 @@ function compactDigitsName(count) {
   return String(count);
 }
 
-const version = `pi32-${compactDigitsName(digits)}-v${indexMajorVersion}`;
+const version =
+  radix === "hexadecimal"
+    ? `pi16-${compactDigitsName(digits)}-v1`
+    : `pi32-${compactDigitsName(digits)}-v${indexMajorVersion}`;
 const outputPath = resolve(
   process.cwd(),
-  process.argv[3] ?? `public/dig-sites/${version}.bin`
+  positionalArgs[1] ?? `public/dig-sites/${version}.bin`
 );
 const manifestPath = outputPath.replace(/\.bin$/, ".json");
 const digitsPerTerm = 14.181647462725477;
-const terms = Math.ceil((digits + 20) / digitsPerTerm);
+const terms = Math.ceil((fractionalDigitCount + 20) / digitsPerTerm);
 const c3Over24 = 10939058860032000n;
 
 function sqrt(value) {
@@ -80,7 +88,41 @@ function piDecimalDigits(count) {
   return raw.slice(1, count + 1);
 }
 
+function piHexDigits(count) {
+  const scaleDigits = count + 8;
+  const scale = 16n ** BigInt(scaleDigits);
+  const { q, t } = binarySplit(0, terms);
+  const scaledPi =
+    (q * 426880n * sqrt(10005n * scale * scale)) / t;
+  const raw = scaledPi.toString(16).padStart(scaleDigits + 1, "0");
+
+  return raw.slice(1, count + 1).toUpperCase();
+}
+
+function colorFor(fragment) {
+  if (radix === "hexadecimal") {
+    return [
+      Number.parseInt(fragment.slice(0, 2), 16),
+      Number.parseInt(fragment.slice(2, 4), 16),
+      Number.parseInt(fragment.slice(4, 6), 16)
+    ];
+  }
+
+  return [
+    Number.parseInt(fragment.slice(0, 3), 10) % 256,
+    Number.parseInt(fragment.slice(3, 6), 10) % 256,
+    Number.parseInt(fragment.slice(6, 9), 10) % 256
+  ];
+}
+
 function signatureFor(fragment) {
+  if (radix === "hexadecimal") {
+    return fragment
+      .slice(6, 22)
+      .split("")
+      .map((digit) => Number.parseInt(digit, 16));
+  }
+
   return fragment
     .slice(9, 25)
     .split("")
@@ -156,22 +198,18 @@ function signatureStats(signature) {
 }
 
 console.log(
-  `Building pi dig site index: ${digits.toLocaleString()} digits, ${terms.toLocaleString()} Chudnovsky terms`
+  `Building pi ${radix} dig site index: ${digits.toLocaleString()} digits, ${terms.toLocaleString()} Chudnovsky terms`
 );
 
-const decimalDigits = piDecimalDigits(digits);
-const fragments = Math.floor((decimalDigits.length - fragmentDigits) / stride) + 1;
+const piDigits = radix === "hexadecimal" ? piHexDigits(digits) : piDecimalDigits(digits);
+const fragments = Math.floor((piDigits.length - fragmentDigits) / stride) + 1;
 const index = Buffer.alloc(fragments * bytesPerFragment);
 
 for (let fragmentIndex = 0; fragmentIndex < fragments; fragmentIndex += 1) {
   const offset = fragmentIndex * stride;
-  const fragment = decimalDigits.slice(offset, offset + fragmentDigits);
+  const fragment = piDigits.slice(offset, offset + fragmentDigits);
   const base = fragmentIndex * bytesPerFragment;
-  const color = [
-    Number.parseInt(fragment.slice(0, 3), 10) % 256,
-    Number.parseInt(fragment.slice(3, 6), 10) % 256,
-    Number.parseInt(fragment.slice(6, 9), 10) % 256
-  ];
+  const color = colorFor(fragment);
   index[base] = color[0];
   index[base + 1] = color[1];
   index[base + 2] = color[2];
@@ -202,7 +240,11 @@ writeFileSync(
   `${JSON.stringify(
     {
       version,
-      source: "pi decimal expansion generated with Chudnovsky binary splitting",
+      source:
+        radix === "hexadecimal"
+          ? "pi hexadecimal expansion generated with Chudnovsky binary splitting"
+          : "pi decimal expansion generated with Chudnovsky binary splitting",
+      radix,
       digits,
       fragmentDigits,
       stride,
