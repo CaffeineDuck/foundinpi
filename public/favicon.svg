@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Found in Pi">
+  <rect width="64" height="64" fill="#d7d5ce" />
+  <path d="M0 16h64M0 32h64M0 48h64M16 0v64M32 0v64M48 0v64" stroke="#b8b5aa" stroke-width="1" opacity=".42" />
+  <rect x="8" y="8" width="48" height="48" rx="5" fill="#171814" />
+  <path d="M12 12h40v40H12z" fill="none" stroke="#ff4d00" stroke-width="2" opacity=".72" />
+  <text x="32" y="43" text-anchor="middle" font-family="Georgia, serif" font-size="35" font-weight="700" fill="#ff4d00">π</text>
+</svg>
