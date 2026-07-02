@@ -4,7 +4,7 @@ export const DIG_SITE_FRAGMENT_DIGITS = 32;
 export const DIG_SITE_FRAGMENT_STRIDE = 7;
 export const DIG_SITE_FRAGMENT_BYTES = 3;
 export const DIG_SITE_INDEX_BYTES_V1 = 11;
-export const DIG_SITE_INDEX_BYTES_V2 = 19;
+export const DIG_SITE_INDEX_BYTES_V2 = 18;
 
 export const DIG_SITES = [
   {
@@ -15,7 +15,7 @@ export const DIG_SITES = [
     indexVersion: "pi32-1m-v2",
     indexUrl: "/dig-sites/pi32-1m-v2.bin",
     indexChecksum:
-      "3fbd4e1c2487913d884fcae1283c0bf26e6e4e0adc8e3c6f8b113d8c2a645672",
+      "c6d1a62658f9093c4838161dea39e6cde773f9932960dc7ca49f29807734f764",
     packedFragmentBytes: DIG_SITE_INDEX_BYTES_V2,
     digits: 1_000_000,
     indexedFragments: 142_853,
@@ -30,7 +30,7 @@ export const DIG_SITES = [
     indexVersion: "pi32-10m-v2",
     indexUrl: "/dig-sites/pi32-10m-v2.bin",
     indexChecksum:
-      "1c91437fa50634f2a09cfa0374079391ffde37e8552de8bb3f922daf67ad61f2",
+      "97a5b7c13ead425c059825d7ed57b716840db6043ea39c8142873536da3c0459",
     packedFragmentBytes: DIG_SITE_INDEX_BYTES_V2,
     digits: 10_000_000,
     indexedFragments: 1_428_567,

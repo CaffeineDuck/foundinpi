@@ -6,7 +6,7 @@ const digits = Number(process.argv[2] ?? 1_000_000);
 const fragmentDigits = 32;
 const stride = 7;
 const indexMajorVersion = 2;
-const bytesPerFragment = 19;
+const bytesPerFragment = 18;
 
 function compactDigitsName(count) {
   if (count % 1_000_000 === 0) return `${count / 1_000_000}m`;
@@ -95,7 +95,7 @@ function signedByte(value) {
   return clamp(value, -127, 127) + 128;
 }
 
-function signatureStats(signature, color) {
+function signatureStats(signature) {
   let min = 15;
   let max = 0;
   let inkSum = 0;
@@ -151,8 +151,7 @@ function signatureStats(signature, color) {
         8,
       -127,
       127
-    ),
-    saturation: Math.max(...color) - Math.min(...color)
+    )
   };
 }
 
@@ -184,7 +183,7 @@ for (let fragmentIndex = 0; fragmentIndex < fragments; fragmentIndex += 1) {
       (signature[sigIndex * 2 + 1] & 0x0f);
   }
 
-  const stats = signatureStats(signature, color);
+  const stats = signatureStats(signature);
   index[base + 11] = stats.contrast;
   index[base + 12] = stats.inkSum;
   index[base + 13] = signedByte(stats.edgeX);
@@ -192,7 +191,6 @@ for (let fragmentIndex = 0; fragmentIndex < fragments; fragmentIndex += 1) {
   index[base + 15] = signedByte(stats.diagonal);
   index[base + 16] = stats.texture;
   index[base + 17] = signedByte(stats.centerBias);
-  index[base + 18] = stats.saturation;
 }
 
 mkdirSync(dirname(outputPath), { recursive: true });
@@ -211,7 +209,7 @@ writeFileSync(
       fragments,
       bytesPerFragment,
       descriptor:
-        "rgb + 4x4 luma + contrast/ink + edge/texture/center/saturation patch descriptor",
+        "rgb + 4x4 luma + contrast/ink + edge/texture/center patch descriptor",
       byteLength: index.byteLength,
       sha256: checksum
     },

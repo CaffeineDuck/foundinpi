@@ -5,8 +5,8 @@
   "fragmentDigits": 32,
   "stride": 7,
   "fragments": 1428567,
-  "bytesPerFragment": 19,
-  "descriptor": "rgb + 4x4 luma + contrast/ink + edge/texture/center/saturation patch descriptor",
-  "byteLength": 27142773,
-  "sha256": "1c91437fa50634f2a09cfa0374079391ffde37e8552de8bb3f922daf67ad61f2"
+  "bytesPerFragment": 18,
+  "descriptor": "rgb + 4x4 luma + contrast/ink + edge/texture/center patch descriptor",
+  "byteLength": 25714206,
+  "sha256": "97a5b7c13ead425c059825d7ed57b716840db6043ea39c8142873536da3c0459"
 }

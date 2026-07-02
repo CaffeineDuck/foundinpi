@@ -71,7 +71,7 @@ function signedByte(value: number) {
   return clamp(value, -127, 127) + 128;
 }
 
-function signatureStats(signature: number[], color: [number, number, number]) {
+function signatureStats(signature: number[]) {
   let min = 15;
   let max = 0;
   let inkSum = 0;
@@ -127,8 +127,7 @@ function signatureStats(signature: number[], color: [number, number, number]) {
         8,
       -127,
       127
-    ),
-    saturation: Math.max(...color) - Math.min(...color)
+    )
   };
 }
 
@@ -150,7 +149,7 @@ function packFragment(bytes: Uint8Array, fragmentIndex: number, raw: string) {
       (signature[sigIndex * 2 + 1] & 0x0f);
   }
 
-  const stats = signatureStats(signature, color);
+  const stats = signatureStats(signature);
   bytes[base + 11] = stats.contrast;
   bytes[base + 12] = stats.inkSum;
   bytes[base + 13] = signedByte(stats.edgeX);
@@ -158,7 +157,6 @@ function packFragment(bytes: Uint8Array, fragmentIndex: number, raw: string) {
   bytes[base + 15] = signedByte(stats.diagonal);
   bytes[base + 16] = stats.texture;
   bytes[base + 17] = signedByte(stats.centerBias);
-  bytes[base + 18] = stats.saturation;
 }
 
 function validatePackedCatalogue(bytes: Uint8Array, digSite: DigSite) {

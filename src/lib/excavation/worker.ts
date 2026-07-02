@@ -332,8 +332,9 @@ function signatureStats(
 
 function fragmentStats(catalogue: PiCatalogue, fragmentIndex: number) {
   const base = fragmentBase(catalogue, fragmentIndex);
+  const rgb = fragmentRgb(catalogue, fragmentIndex);
 
-  if (catalogue.bytesPerFragment >= 19) {
+  if (catalogue.bytesPerFragment >= 18) {
     return {
       contrast: catalogue.bytes[base + 11],
       inkSum: catalogue.bytes[base + 12],
@@ -342,14 +343,11 @@ function fragmentStats(catalogue: PiCatalogue, fragmentIndex: number) {
       diagonal: signedFeature(catalogue.bytes[base + 15]),
       texture: catalogue.bytes[base + 16],
       centerBias: signedFeature(catalogue.bytes[base + 17]),
-      saturation: catalogue.bytes[base + 18]
+      saturation: Math.max(...rgb) - Math.min(...rgb)
     };
   }
 
-  return signatureStats(
-    signatureArray(catalogue, fragmentIndex),
-    fragmentRgb(catalogue, fragmentIndex)
-  );
+  return signatureStats(signatureArray(catalogue, fragmentIndex), rgb);
 }
 
 function signatureDistanceSum(
