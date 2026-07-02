@@ -5,6 +5,8 @@ import { dirname, resolve } from "node:path";
 const digits = Number(process.argv[2] ?? 1_000_000);
 const fragmentDigits = 32;
 const stride = 7;
+const indexMajorVersion = 2;
+const bytesPerFragment = 19;
 
 function compactDigitsName(count) {
   if (count % 1_000_000 === 0) return `${count / 1_000_000}m`;
@@ -12,7 +14,7 @@ function compactDigitsName(count) {
   return String(count);
 }
 
-const version = `pi32-${compactDigitsName(digits)}-v1`;
+const version = `pi32-${compactDigitsName(digits)}-v${indexMajorVersion}`;
 const outputPath = resolve(
   process.cwd(),
   process.argv[3] ?? `public/dig-sites/${version}.bin`
@@ -85,21 +87,95 @@ function signatureFor(fragment) {
     .map((digit) => Math.round((Number.parseInt(digit, 10) / 9) * 15));
 }
 
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, Math.round(value)));
+}
+
+function signedByte(value) {
+  return clamp(value, -127, 127) + 128;
+}
+
+function signatureStats(signature, color) {
+  let min = 15;
+  let max = 0;
+  let inkSum = 0;
+  let edgeX = 0;
+  let edgeY = 0;
+  let diagonal = 0;
+  let neighborDiff = 0;
+  let neighborCount = 0;
+  let centerSum = 0;
+  let outerSum = 0;
+  let centerCount = 0;
+  let outerCount = 0;
+
+  for (let y = 0; y < 4; y += 1) {
+    for (let x = 0; x < 4; x += 1) {
+      const value = signature[y * 4 + x] ?? 0;
+      min = Math.min(min, value);
+      max = Math.max(max, value);
+      inkSum += value;
+      edgeX += value * (x * 2 - 3);
+      edgeY += value * (y * 2 - 3);
+      diagonal += value * (x - y);
+
+      if (x < 3) {
+        neighborDiff += Math.abs(value - (signature[y * 4 + x + 1] ?? 0));
+        neighborCount += 1;
+      }
+      if (y < 3) {
+        neighborDiff += Math.abs(value - (signature[(y + 1) * 4 + x] ?? 0));
+        neighborCount += 1;
+      }
+
+      if (x >= 1 && x <= 2 && y >= 1 && y <= 2) {
+        centerSum += value;
+        centerCount += 1;
+      } else {
+        outerSum += value;
+        outerCount += 1;
+      }
+    }
+  }
+
+  return {
+    contrast: max - min,
+    inkSum,
+    edgeX: clamp(edgeX / 4, -127, 127),
+    edgeY: clamp(edgeY / 4, -127, 127),
+    diagonal: clamp(diagonal / 2, -127, 127),
+    texture: clamp((neighborDiff / Math.max(1, neighborCount)) * 17, 0, 255),
+    centerBias: clamp(
+      (centerSum / Math.max(1, centerCount) -
+        outerSum / Math.max(1, outerCount)) *
+        8,
+      -127,
+      127
+    ),
+    saturation: Math.max(...color) - Math.min(...color)
+  };
+}
+
 console.log(
   `Building pi dig site index: ${digits.toLocaleString()} digits, ${terms.toLocaleString()} Chudnovsky terms`
 );
 
 const decimalDigits = piDecimalDigits(digits);
 const fragments = Math.floor((decimalDigits.length - fragmentDigits) / stride) + 1;
-const index = Buffer.alloc(fragments * 11);
+const index = Buffer.alloc(fragments * bytesPerFragment);
 
 for (let fragmentIndex = 0; fragmentIndex < fragments; fragmentIndex += 1) {
   const offset = fragmentIndex * stride;
   const fragment = decimalDigits.slice(offset, offset + fragmentDigits);
-  const base = fragmentIndex * 11;
-  index[base] = Number.parseInt(fragment.slice(0, 3), 10) % 256;
-  index[base + 1] = Number.parseInt(fragment.slice(3, 6), 10) % 256;
-  index[base + 2] = Number.parseInt(fragment.slice(6, 9), 10) % 256;
+  const base = fragmentIndex * bytesPerFragment;
+  const color = [
+    Number.parseInt(fragment.slice(0, 3), 10) % 256,
+    Number.parseInt(fragment.slice(3, 6), 10) % 256,
+    Number.parseInt(fragment.slice(6, 9), 10) % 256
+  ];
+  index[base] = color[0];
+  index[base + 1] = color[1];
+  index[base + 2] = color[2];
 
   const signature = signatureFor(fragment);
   for (let sigIndex = 0; sigIndex < 8; sigIndex += 1) {
@@ -107,6 +183,16 @@ for (let fragmentIndex = 0; fragmentIndex < fragments; fragmentIndex += 1) {
       ((signature[sigIndex * 2] & 0x0f) << 4) |
       (signature[sigIndex * 2 + 1] & 0x0f);
   }
+
+  const stats = signatureStats(signature, color);
+  index[base + 11] = stats.contrast;
+  index[base + 12] = stats.inkSum;
+  index[base + 13] = signedByte(stats.edgeX);
+  index[base + 14] = signedByte(stats.edgeY);
+  index[base + 15] = signedByte(stats.diagonal);
+  index[base + 16] = stats.texture;
+  index[base + 17] = signedByte(stats.centerBias);
+  index[base + 18] = stats.saturation;
 }
 
 mkdirSync(dirname(outputPath), { recursive: true });
@@ -123,7 +209,9 @@ writeFileSync(
       fragmentDigits,
       stride,
       fragments,
-      bytesPerFragment: 11,
+      bytesPerFragment,
+      descriptor:
+        "rgb + 4x4 luma + contrast/ink + edge/texture/center/saturation patch descriptor",
       byteLength: index.byteLength,
       sha256: checksum
     },

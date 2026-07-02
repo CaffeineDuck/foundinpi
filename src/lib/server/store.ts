@@ -5,7 +5,11 @@ import type {
   RelicRecord,
   RelicStatus
 } from "./types";
-import { DEFAULT_DIG_SITE, DIG_SITES } from "../excavation/constants";
+import {
+  DEFAULT_DIG_SITE,
+  DIG_SITE_HISTORY,
+  DIG_SITES
+} from "../excavation/constants";
 
 export type EnvLike = {
   DB?: D1Database;
@@ -113,9 +117,11 @@ function legacyTitle(row: DbRelic) {
 
 function siteFromLabel(label: string | undefined) {
   const clean = label ?? "";
-  const exact = DIG_SITES.find((site) => site.label === clean);
+  const exact = DIG_SITE_HISTORY.find((site) => site.label === clean);
   if (exact) return exact;
-  const byVersion = DIG_SITES.find((site) => clean.includes(site.indexVersion));
+  const byVersion = DIG_SITE_HISTORY.find((site) =>
+    clean.includes(site.indexVersion)
+  );
   if (byVersion) return byVersion;
   if (clean.includes("10,000,000")) return DIG_SITES[1];
   if (clean.includes("1,000,000")) return DIG_SITES[0];
@@ -124,7 +130,7 @@ function siteFromLabel(label: string | undefined) {
 
 function resolveInputDigSite(input: PublishRelicInput) {
   const site =
-    DIG_SITES.find((entry) => entry.indexVersion === input.indexVersion) ??
+    DIG_SITE_HISTORY.find((entry) => entry.indexVersion === input.indexVersion) ??
     siteFromLabel(input.digSite);
 
   return {
@@ -138,7 +144,7 @@ function resolveInputDigSite(input: PublishRelicInput) {
 
 function resolveRowDigSite(row: DbRelic) {
   const site =
-    DIG_SITES.find((entry) => entry.indexVersion === row.index_version) ??
+    DIG_SITE_HISTORY.find((entry) => entry.indexVersion === row.index_version) ??
     siteFromLabel(row.dig_site);
 
   return {

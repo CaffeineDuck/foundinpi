@@ -9,7 +9,6 @@ import {
 import {
   getDigSiteStats,
   getPiCatalogue,
-  PACKED_FRAGMENT_BYTES,
   type PiCatalogue
 } from "./pi";
 import { summarizeTiles } from "./scoring";
@@ -25,13 +24,14 @@ const ctx = self as DedicatedWorkerGlobalScope;
 const COLOR_BUCKET_STEPS = 16;
 const COLOR_BUCKET_MASK = COLOR_BUCKET_STEPS - 1;
 const SIGNATURE_BUCKETS = 256;
+const PATCH_BUCKETS = 512;
 const MIN_COLOR_CANDIDATES = 160;
 const COLOR_SEARCH_RADIUS = 1;
 const COLOR_FALLBACK_RADIUS = 2;
-const EXACT_DISTANCE_THRESHOLD = 20;
+const EXACT_DISTANCE_THRESHOLD = 17;
 const EXACT_MIN_SOURCE_CONTRAST = 2;
-const NEAR_DISTANCE_THRESHOLD = 34;
-const LOSSY_DISTANCE_THRESHOLD = 42;
+const NEAR_DISTANCE_THRESHOLD = 26;
+const LOSSY_DISTANCE_THRESHOLD = 33;
 
 type PiSearchIndex = {
   catalogue: PiCatalogue;
@@ -39,10 +39,31 @@ type PiSearchIndex = {
   colorBucketItems: Uint32Array;
   signatureBucketStarts: Uint32Array;
   signatureBucketItems: Uint32Array;
+  patchBucketStarts: Uint32Array;
+  patchBucketItems: Uint32Array;
   contrast: Uint8Array;
   inkSum: Uint8Array;
+  edgeX: Int16Array;
+  edgeY: Int16Array;
+  diagonal: Int16Array;
+  texture: Uint8Array;
+  centerBias: Int16Array;
+  saturation: Uint8Array;
   seen: Uint32Array;
   seenMark: number;
+};
+
+type PatchDescriptor = {
+  color: [number, number, number];
+  signature: number[];
+  contrast: number;
+  inkSum: number;
+  edgeX: number;
+  edgeY: number;
+  diagonal: number;
+  texture: number;
+  centerBias: number;
+  saturation: number;
 };
 
 type PiFragmentView = {
@@ -66,7 +87,7 @@ function fragmentColorDistance(
   fragmentIndex: number,
   color: [number, number, number]
 ) {
-  const base = fragmentBase(fragmentIndex);
+  const base = fragmentBase(catalogue, fragmentIndex);
   const dr = color[0] - catalogue.bytes[base];
   const dg = color[1] - catalogue.bytes[base + 1];
   const db = color[2] - catalogue.bytes[base + 2];
@@ -95,6 +116,10 @@ function classify(
 
 function clamp(value: number) {
   return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function clampSigned(value: number) {
+  return Math.max(-127, Math.min(127, Math.round(value)));
 }
 
 function luma(color: [number, number, number]) {
@@ -210,13 +235,13 @@ function heatmapColor(className: TileClass) {
   return [rgb[0], rgb[1], rgb[2], className === "earth" ? 124 : 156];
 }
 
-function fragmentBase(index: number) {
-  return index * PACKED_FRAGMENT_BYTES;
+function fragmentBase(catalogue: PiCatalogue, index: number) {
+  return index * catalogue.bytesPerFragment;
 }
 
 function signatureValue(catalogue: PiCatalogue, fragmentIndex: number, index: number) {
   const packed =
-    catalogue.bytes[fragmentBase(fragmentIndex) + 3 + (index >> 1)];
+    catalogue.bytes[fragmentBase(catalogue, fragmentIndex) + 3 + (index >> 1)];
   return index % 2 === 0 ? (packed >> 4) & 0x0f : packed & 0x0f;
 }
 
@@ -231,7 +256,7 @@ function signatureArray(catalogue: PiCatalogue, fragmentIndex: number) {
 }
 
 function fragmentRgb(catalogue: PiCatalogue, fragmentIndex: number) {
-  const base = fragmentBase(fragmentIndex);
+  const base = fragmentBase(catalogue, fragmentIndex);
   return [
     catalogue.bytes[base],
     catalogue.bytes[base + 1],
@@ -239,22 +264,92 @@ function fragmentRgb(catalogue: PiCatalogue, fragmentIndex: number) {
   ] satisfies [number, number, number];
 }
 
-function fragmentStats(catalogue: PiCatalogue, fragmentIndex: number) {
+function signedFeature(value: number) {
+  return value - 128;
+}
+
+function signatureStats(
+  signature: number[],
+  color: [number, number, number]
+) {
   let min = 15;
   let max = 0;
-  let sum = 0;
+  let inkSum = 0;
+  let edgeX = 0;
+  let edgeY = 0;
+  let diagonal = 0;
+  let neighborDiff = 0;
+  let neighborCount = 0;
+  let centerSum = 0;
+  let outerSum = 0;
+  let centerCount = 0;
+  let outerCount = 0;
 
-  for (let index = 0; index < 16; index += 1) {
-    const value = signatureValue(catalogue, fragmentIndex, index);
-    min = Math.min(min, value);
-    max = Math.max(max, value);
-    sum += value;
+  for (let y = 0; y < 4; y += 1) {
+    for (let x = 0; x < 4; x += 1) {
+      const value = signature[y * 4 + x] ?? 0;
+      min = Math.min(min, value);
+      max = Math.max(max, value);
+      inkSum += value;
+      edgeX += value * (x * 2 - 3);
+      edgeY += value * (y * 2 - 3);
+      diagonal += value * (x - y);
+
+      if (x < 3) {
+        neighborDiff += Math.abs(value - (signature[y * 4 + x + 1] ?? 0));
+        neighborCount += 1;
+      }
+      if (y < 3) {
+        neighborDiff += Math.abs(value - (signature[(y + 1) * 4 + x] ?? 0));
+        neighborCount += 1;
+      }
+
+      if (x >= 1 && x <= 2 && y >= 1 && y <= 2) {
+        centerSum += value;
+        centerCount += 1;
+      } else {
+        outerSum += value;
+        outerCount += 1;
+      }
+    }
   }
 
   return {
     contrast: max - min,
-    inkSum: sum
+    inkSum,
+    edgeX: clampSigned(edgeX / 4),
+    edgeY: clampSigned(edgeY / 4),
+    diagonal: clampSigned(diagonal / 2),
+    texture: clamp((neighborDiff / Math.max(1, neighborCount)) * 17),
+    centerBias: clampSigned(
+      (centerSum / Math.max(1, centerCount) -
+        outerSum / Math.max(1, outerCount)) *
+        8
+    ),
+    saturation: Math.max(...color) - Math.min(...color)
   };
+}
+
+function fragmentStats(catalogue: PiCatalogue, fragmentIndex: number) {
+  const base = fragmentBase(catalogue, fragmentIndex);
+
+  if (catalogue.bytesPerFragment >= 19) {
+    return {
+      contrast: catalogue.bytes[base + 11],
+      inkSum: catalogue.bytes[base + 12],
+      edgeX: signedFeature(catalogue.bytes[base + 13]),
+      edgeY: signedFeature(catalogue.bytes[base + 14]),
+      diagonal: signedFeature(catalogue.bytes[base + 15]),
+      texture: catalogue.bytes[base + 16],
+      centerBias: signedFeature(catalogue.bytes[base + 17]),
+      saturation: catalogue.bytes[base + 18]
+    };
+  }
+
+  return signatureStats(
+    signatureArray(catalogue, fragmentIndex),
+    fragmentRgb(catalogue, fragmentIndex)
+  );
 }
 
 function signatureDistanceSum(
@@ -263,7 +358,7 @@ function signatureDistanceSum(
   signature: number[]
 ) {
   let distance = 0;
-  const base = fragmentBase(fragmentIndex) + 3;
+  const base = fragmentBase(catalogue, fragmentIndex) + 3;
 
   for (let packedIndex = 0; packedIndex < 8; packedIndex += 1) {
     const packed = catalogue.bytes[base + packedIndex];
@@ -298,7 +393,7 @@ function fragmentView(
 }
 
 function colorBucketKeyForFragment(catalogue: PiCatalogue, fragmentIndex: number) {
-  const base = fragmentBase(fragmentIndex);
+  const base = fragmentBase(catalogue, fragmentIndex);
   return (
     ((catalogue.bytes[base] >> 4) << 8) |
     ((catalogue.bytes[base + 1] >> 4) << 4) |
@@ -341,6 +436,54 @@ function signatureBucketKeyForFragment(
   );
 }
 
+function edgeDirectionBucket(edgeX: number, edgeY: number) {
+  const ax = Math.abs(edgeX);
+  const ay = Math.abs(edgeY);
+  if (ax + ay < 8) return 0;
+  if (ax > ay * 1.6) return edgeX >= 0 ? 1 : 2;
+  if (ay > ax * 1.6) return edgeY >= 0 ? 3 : 4;
+  if (edgeX >= 0 && edgeY >= 0) return 5;
+  if (edgeX < 0 && edgeY >= 0) return 6;
+  return edgeX >= 0 ? 7 : 0;
+}
+
+function patchBucketKey(stats: {
+  contrast: number;
+  texture: number;
+  edgeX: number;
+  edgeY: number;
+  centerBias: number;
+}) {
+  const contrastBucket = Math.min(3, stats.contrast >> 2);
+  const textureBucket = Math.min(3, stats.texture >> 6);
+  const centerBucket = Math.min(3, (stats.centerBias + 128) >> 6);
+
+  return (
+    (contrastBucket << 7) |
+    (textureBucket << 5) |
+    (edgeDirectionBucket(stats.edgeX, stats.edgeY) << 2) |
+    centerBucket
+  );
+}
+
+function patchBucketKeyForFragment(
+  catalogue: PiCatalogue,
+  fragmentIndex: number
+) {
+  return patchBucketKey(fragmentStats(catalogue, fragmentIndex));
+}
+
+function patchDescriptor(
+  color: [number, number, number],
+  signature: number[]
+): PatchDescriptor {
+  return {
+    color,
+    signature,
+    ...signatureStats(signature, color)
+  };
+}
+
 function startsFromCounts(counts: Uint32Array) {
   const starts = new Uint32Array(counts.length + 1);
 
@@ -354,36 +497,58 @@ function startsFromCounts(counts: Uint32Array) {
 function buildSearchIndex(catalogue: PiCatalogue) {
   const colorCounts = new Uint32Array(COLOR_BUCKET_STEPS ** 3);
   const signatureCounts = new Uint32Array(SIGNATURE_BUCKETS);
+  const patchCounts = new Uint32Array(PATCH_BUCKETS);
   const contrast = new Uint8Array(catalogue.fragments);
   const inkSum = new Uint8Array(catalogue.fragments);
+  const edgeX = new Int16Array(catalogue.fragments);
+  const edgeY = new Int16Array(catalogue.fragments);
+  const diagonal = new Int16Array(catalogue.fragments);
+  const texture = new Uint8Array(catalogue.fragments);
+  const centerBias = new Int16Array(catalogue.fragments);
+  const saturation = new Uint8Array(catalogue.fragments);
 
   for (let index = 0; index < catalogue.fragments; index += 1) {
     colorCounts[colorBucketKeyForFragment(catalogue, index)] += 1;
     signatureCounts[signatureBucketKeyForFragment(catalogue, index)] += 1;
 
     const stats = fragmentStats(catalogue, index);
+    patchCounts[patchBucketKey(stats)] += 1;
     contrast[index] = stats.contrast;
     inkSum[index] = stats.inkSum;
+    edgeX[index] = stats.edgeX;
+    edgeY[index] = stats.edgeY;
+    diagonal[index] = stats.diagonal;
+    texture[index] = stats.texture;
+    centerBias[index] = stats.centerBias;
+    saturation[index] = stats.saturation;
   }
 
   const colorBucketStarts = startsFromCounts(colorCounts);
   const signatureBucketStarts = startsFromCounts(signatureCounts);
+  const patchBucketStarts = startsFromCounts(patchCounts);
   const colorBucketItems = new Uint32Array(catalogue.fragments);
   const signatureBucketItems = new Uint32Array(catalogue.fragments);
+  const patchBucketItems = new Uint32Array(catalogue.fragments);
   const colorCursor = new Uint32Array(
     colorBucketStarts.subarray(0, colorCounts.length)
   );
   const signatureCursor = new Uint32Array(
     signatureBucketStarts.subarray(0, signatureCounts.length)
   );
+  const patchCursor = new Uint32Array(
+    patchBucketStarts.subarray(0, patchCounts.length)
+  );
 
   for (let index = 0; index < catalogue.fragments; index += 1) {
     const colorKey = colorBucketKeyForFragment(catalogue, index);
     const signatureKey = signatureBucketKeyForFragment(catalogue, index);
+    const patchKey = patchBucketKeyForFragment(catalogue, index);
     colorBucketItems[colorCursor[colorKey]] = index;
     colorCursor[colorKey] += 1;
     signatureBucketItems[signatureCursor[signatureKey]] = index;
     signatureCursor[signatureKey] += 1;
+    patchBucketItems[patchCursor[patchKey]] = index;
+    patchCursor[patchKey] += 1;
   }
 
   return {
@@ -392,8 +557,16 @@ function buildSearchIndex(catalogue: PiCatalogue) {
     colorBucketItems,
     signatureBucketStarts,
     signatureBucketItems,
+    patchBucketStarts,
+    patchBucketItems,
     contrast,
     inkSum,
+    edgeX,
+    edgeY,
+    diagonal,
+    texture,
+    centerBias,
+    saturation,
     seen: new Uint32Array(catalogue.fragments),
     seenMark: 0
   } satisfies PiSearchIndex;
@@ -410,19 +583,23 @@ async function getPiSearchIndex(digSiteId: DigSiteId) {
   return searchIndex;
 }
 
-function findNearestPiFragment(
-  color: [number, number, number],
-  signature: number[],
-  searchIndex: PiSearchIndex
-) {
+function findNearestPiFragment(sourcePatch: PatchDescriptor, searchIndex: PiSearchIndex) {
   const {
     catalogue,
     colorBucketStarts,
     colorBucketItems,
     signatureBucketStarts,
     signatureBucketItems,
+    patchBucketStarts,
+    patchBucketItems,
     contrast,
     inkSum,
+    edgeX,
+    edgeY,
+    diagonal,
+    texture,
+    centerBias,
+    saturation,
     seen
   } = searchIndex;
   let bestIndex = 0;
@@ -438,8 +615,6 @@ function findNearestPiFragment(
   }
 
   const seenMark = searchIndex.seenMark;
-  const sourceContrast = Math.max(...signature) - Math.min(...signature);
-  const sourceInkSum = signature.reduce((total, value) => total + value, 0);
 
   function consider(candidateIndex: number) {
     if (seen[candidateIndex] === seenMark) return;
@@ -449,20 +624,38 @@ function findNearestPiFragment(
     const candidateColorDistance = fragmentColorDistance(
       catalogue,
       candidateIndex,
-      color
+      sourcePatch.color
     );
     const candidateSignatureDistanceSum = signatureDistanceSum(
       catalogue,
       candidateIndex,
-      signature
+      sourcePatch.signature
     );
-    const contrastDistance = Math.abs(sourceContrast - contrast[candidateIndex]);
-    const inkDistance = Math.abs(sourceInkSum - inkSum[candidateIndex]) / 16;
+    const contrastDistance = Math.abs(
+      sourcePatch.contrast - contrast[candidateIndex]
+    );
+    const inkDistance = Math.abs(sourcePatch.inkSum - inkSum[candidateIndex]) / 16;
+    const edgeDistance =
+      (Math.abs(sourcePatch.edgeX - edgeX[candidateIndex]) +
+        Math.abs(sourcePatch.edgeY - edgeY[candidateIndex]) +
+        Math.abs(sourcePatch.diagonal - diagonal[candidateIndex])) /
+      24;
+    const textureDistance =
+      Math.abs(sourcePatch.texture - texture[candidateIndex]) / 17;
+    const centerDistance =
+      Math.abs(sourcePatch.centerBias - centerBias[candidateIndex]) / 16;
+    const saturationDistance = Math.abs(
+      sourcePatch.saturation - saturation[candidateIndex]
+    );
     const distance =
-      candidateColorDistance * 0.08 +
-      (candidateSignatureDistanceSum / 16) * 7.4 +
-      contrastDistance * 2.2 +
-      inkDistance * 1.3;
+      candidateColorDistance * 0.045 +
+      (candidateSignatureDistanceSum / 16) * 4.9 +
+      contrastDistance * 1.25 +
+      inkDistance * 0.55 +
+      edgeDistance * 3.2 +
+      textureDistance * 1.1 +
+      centerDistance * 0.8 +
+      saturationDistance * 0.035;
 
     if (distance < bestDistance) {
       bestIndex = candidateIndex;
@@ -473,9 +666,9 @@ function findNearestPiFragment(
   }
 
   function searchColorBuckets(radius: number) {
-    const rBucket = (color[0] >> 4) & COLOR_BUCKET_MASK;
-    const gBucket = (color[1] >> 4) & COLOR_BUCKET_MASK;
-    const bBucket = (color[2] >> 4) & COLOR_BUCKET_MASK;
+    const rBucket = (sourcePatch.color[0] >> 4) & COLOR_BUCKET_MASK;
+    const gBucket = (sourcePatch.color[1] >> 4) & COLOR_BUCKET_MASK;
+    const bBucket = (sourcePatch.color[2] >> 4) & COLOR_BUCKET_MASK;
 
     for (
       let r = Math.max(0, rBucket - radius);
@@ -506,7 +699,7 @@ function findNearestPiFragment(
 
   searchColorBuckets(COLOR_SEARCH_RADIUS);
 
-  const signatureKey = signatureBucketKey(signature);
+  const signatureKey = signatureBucketKey(sourcePatch.signature);
   const signatureStart = signatureBucketStarts[signatureKey];
   const signatureEnd = signatureBucketStarts[signatureKey + 1];
   for (
@@ -515,6 +708,13 @@ function findNearestPiFragment(
     itemIndex += 1
   ) {
     consider(signatureBucketItems[itemIndex]);
+  }
+
+  const patchKey = patchBucketKey(sourcePatch);
+  const patchStart = patchBucketStarts[patchKey];
+  const patchEnd = patchBucketStarts[patchKey + 1];
+  for (let itemIndex = patchStart; itemIndex < patchEnd; itemIndex += 1) {
+    consider(patchBucketItems[itemIndex]);
   }
 
   if (candidateCount < MIN_COLOR_CANDIDATES) {
@@ -594,8 +794,9 @@ async function processImage(request: WorkerRequest) {
       const sourceSignature = signatureSums.map((sum, index) =>
         clamp((sum / Math.max(1, signatureCounts[index]) / 255) * 15)
       );
+      const sourcePatch = patchDescriptor(average, sourceSignature);
       const { best, bestDistance, bestColorDistance, exactSignature } =
-        findNearestPiFragment(average, sourceSignature, searchIndex);
+        findNearestPiFragment(sourcePatch, searchIndex);
       const isExact = exactSignature && bestColorDistance <= 48;
       const className = classify(bestDistance, isExact, sourceSignature);
       const recovered = best.rgb;

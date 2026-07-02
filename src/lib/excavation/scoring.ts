@@ -11,8 +11,8 @@ const CLASS_WEIGHT: Record<TileClass, number> = {
   earth: 0
 };
 
-const DISTANCE_SCORE_MIN = 18;
-const DISTANCE_SCORE_MAX = 58;
+const DISTANCE_SCORE_MIN = 14;
+const DISTANCE_SCORE_MAX = 42;
 const DISTANCE_SCORE_CURVE = 1.18;
 const MATCH_SCORE_WEIGHT = 0.84;
 
