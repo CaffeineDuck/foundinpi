@@ -918,7 +918,7 @@ export default function ExcavationApp() {
 
   return (
     <div className="app" data-phase={phase} aria-label="Found in Pi excavation app">
-      <header className="app-bar">
+      <header className="app-bar screws">
         <a className="wordmark" href="/">
           Found in Pi
         </a>
@@ -961,7 +961,7 @@ export default function ExcavationApp() {
           </p>
 
           <label
-            className="drop-hero"
+            className="drop-hero screws"
             data-drag={isDragging ? "true" : "false"}
             onDragOver={(event) => event.preventDefault()}
             onDragEnter={(event) => {
@@ -1167,7 +1167,7 @@ export default function ExcavationApp() {
             </div>
           </div>
 
-          <aside className="report">
+          <aside className="report screws">
             {phase === "scanning" ? (
               <div className="report-live">
                 <p className="report-kicker">

@@ -25,7 +25,7 @@
 
   --line: #c7c4ba;
   --line-strong: #a09d90;
-  --screw: #b3b0a4;
+  --screw: #a5a296;
 
   /* safety-orange signal */
   --accent: #ff4d00;
@@ -139,14 +139,14 @@ p {
 .screws::before {
   content: "";
   position: absolute;
-  inset: 9px;
+  inset: 11px;
   z-index: 3;
   pointer-events: none;
   background:
-    radial-gradient(circle at top left, var(--screw) 0 1.6px, transparent 2.1px),
-    radial-gradient(circle at top right, var(--screw) 0 1.6px, transparent 2.1px),
-    radial-gradient(circle at bottom left, var(--screw) 0 1.6px, transparent 2.1px),
-    radial-gradient(circle at bottom right, var(--screw) 0 1.6px, transparent 2.1px);
+    radial-gradient(circle at top left, var(--screw) 0 2.2px, rgb(38 34 26 / 0.28) 2.4px 3px, transparent 3.3px),
+    radial-gradient(circle at top right, var(--screw) 0 2.2px, rgb(38 34 26 / 0.28) 2.4px 3px, transparent 3.3px),
+    radial-gradient(circle at bottom left, var(--screw) 0 2.2px, rgb(38 34 26 / 0.28) 2.4px 3px, transparent 3.3px),
+    radial-gradient(circle at bottom right, var(--screw) 0 2.2px, rgb(38 34 26 / 0.28) 2.4px 3px, transparent 3.3px);
 }
 
 /* --- page atmosphere ----------------------------------------------------- */
@@ -205,11 +205,12 @@ p {
 }
 
 .app-bar {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 12px 16px;
+  padding: 12px 20px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
   background: var(--surface);
@@ -2296,10 +2297,12 @@ p {
   to { opacity: 1; }
 }
 
+/* NB: never animate clip-path here — the reveal slider owns clip-path inline,
+   and an animation (with fill-mode both) would lock it and break the slider. */
 @keyframes ignite {
-  0% { opacity: 0; filter: brightness(2.2) saturate(0); clip-path: inset(0 100% 0 0); }
+  0% { opacity: 0; filter: brightness(2.2) saturate(0); }
   60% { opacity: 1; filter: brightness(1.25) saturate(1.05); }
-  100% { opacity: 1; filter: none; clip-path: inset(0 0 0 0); }
+  100% { opacity: 1; filter: none; }
 }
 
 @keyframes grow {
