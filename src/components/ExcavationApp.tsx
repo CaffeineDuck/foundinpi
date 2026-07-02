@@ -5,6 +5,7 @@ import {
   FlaskConical,
   Grid3X3,
   ImagePlus,
+  Info,
   Landmark,
   Layers,
   Link,
@@ -923,6 +924,10 @@ export default function ExcavationApp() {
           <a href="/random">
             <Shuffle size={16} aria-hidden="true" />
             Random
+          </a>
+          <a href="/about">
+            <Info size={16} aria-hidden="true" />
+            About
           </a>
         </nav>
       </header>

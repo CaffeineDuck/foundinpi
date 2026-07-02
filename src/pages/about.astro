@@ -1,0 +1,101 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+const title = "About Found in Pi";
+const description =
+  "Found in Pi is a tiny internet toy for turning images into honest, shareable pi relics.";
+const canonical = new URL("/about", Astro.url.origin).toString();
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "AboutPage",
+  name: title,
+  description,
+  url: canonical
+};
+---
+
+<BaseLayout title={title} description={description} canonical={canonical} jsonLd={jsonLd}>
+  <main class="about-shell">
+    <nav class="about-nav" aria-label="About page">
+      <a href="/" class="wordmark">Found in Pi</a>
+      <div class="header-links">
+        <a class="primary-link secondary" href="/museum">Museum</a>
+        <a class="primary-link" href="/">Try it</a>
+      </div>
+    </nav>
+
+    <section class="about-hero">
+      <p class="eyebrow">About</p>
+      <h1>A dumb, honest toy about finding pictures in pi.</h1>
+      <p>
+        Found in Pi is a fun product built around an old internet joke: if every
+        file is somewhere in pi, can you store anything for free?
+      </p>
+      <p>
+        The real answer is no. So this does not pretend to do that. You upload
+        an image, the site searches a finite chunk of pi, and it redraws your
+        image from the closest fragments it can find there.
+      </p>
+    </section>
+
+    <section class="about-grid" aria-label="What Found in Pi does">
+      <article>
+        <h2>What it does</h2>
+        <p>
+          It breaks your image into small tiles, looks for pi fragments that
+          roughly match those tiles, and makes a new image out of those matches.
+          Then it gives the result a name, a score, and a shareable page.
+        </p>
+      </article>
+
+      <article>
+        <h2>What it does not do</h2>
+        <p>
+          It does not search all of pi. It does not compress your file into pi.
+          It does not prove your image was always waiting there. That would be
+          funny, but it would also be fake.
+        </p>
+      </article>
+
+      <article>
+        <h2>Why the score exists</h2>
+        <p>
+          The score is just a way to compare results inside this site. Some
+          images fit the current dig site better than others. That is the whole
+          game.
+        </p>
+      </article>
+
+      <article>
+        <h2>Why publish</h2>
+        <p>
+          Good results can live in the museum. The more a relic is viewed, the
+          higher it can show up. It is meant to be something you can post, send
+          to a friend, or stumble into from the random page.
+        </p>
+      </article>
+    </section>
+
+    <section class="about-note">
+      <h2>The honesty contract</h2>
+      <p>
+        Found in Pi searches declared dig sites. Dig Site I is the fast default.
+        Dig Site II searches deeper. Every relic says which one it used, how
+        many digits were searched, and which index version produced it.
+      </p>
+      <p>
+        The product is more interesting when the limits are visible. The point
+        is not to fake magic. The point is to make a weird little artifact and
+        show the receipt.
+      </p>
+    </section>
+
+    <section class="about-cta">
+      <a class="primary-link" href="/">Make a relic</a>
+      <a class="primary-link secondary" href="/random">Open random</a>
+      <a class="plain-link" href="https://x.com/caffe1neduck" rel="noreferrer">
+        built by @caffe1neduck
+      </a>
+    </section>
+  </main>
+</BaseLayout>
