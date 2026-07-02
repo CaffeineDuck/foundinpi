@@ -126,10 +126,10 @@ const BREAKDOWN: ReadonlyArray<{ k: TileClass; label: string }> = [
 
 // plain-language explanation of each match type (used in tooltips)
 const CLASS_TIP: Record<TileClass, string> = {
-  exact: "Found in pi exactly as-is — a perfect match.",
-  near: "Almost in pi — nudged a little to fit.",
-  lossy: "Rebuilt from pi to roughly resemble the original.",
-  earth: "Not in pi at all — kept from your original photo."
+  exact: "A very tight pi fragment at this tile scale.",
+  near: "A close pi fragment with small visual drift.",
+  lossy: "A weak pi fragment that still carries the rough shape or color.",
+  earth: "No credible pi fit in this dig site; rendered as dark pi-derived fill."
 };
 
 function isDigSiteId(value: string | null): value is DigSiteId {
@@ -649,29 +649,26 @@ export default function ExcavationApp() {
     }
 
     const root = document.documentElement;
-    const theme = root.dataset.theme ?? "lab";
     const styles = getComputedStyle(root);
     const tone = (name: string, fallback: string) =>
       styles.getPropertyValue(name).trim() || fallback;
 
-    const bg = tone("--bg", "#0b0d0c");
-    const ink = tone("--ink", "#e7f0e8");
-    const inkDim = tone("--ink-dim", "#aebbb0");
-    const muted = tone("--muted", "#7d8a80");
-    const accent = tone("--accent", "#39e08b");
-    const gold = tone("--gold", "#ecc94b");
-    const line = tone("--line-strong", "rgba(120,220,170,0.34)");
+    const bg = tone("--bg", "#d7d5ce");
+    const ink = tone("--ink", "#1a1915");
+    const inkDim = tone("--ink-dim", "#56544c");
+    const muted = tone("--muted", "#86847a");
+    const accent = tone("--accent", "#ff4d00");
+    const gold = tone("--gold", "#a9781f");
+    const line = tone("--line-strong", "#a09d90");
     const gridColors: Record<TileClass, string> = {
-      exact: tone("--exact", "#39e08b"),
-      near: tone("--near", "#f2b13a"),
-      lossy: tone("--lossy", "#5fc9e8"),
-      earth: tone("--earth", "#55635a")
+      exact: tone("--exact", "#1f7a3d"),
+      near: tone("--near", "#d98a00"),
+      lossy: tone("--lossy", "#2f6db0"),
+      earth: tone("--earth", "#8f8c82")
     };
-    const light = theme === "bone" || theme === "console";
-    const display =
-      theme === "bone" ? "Fraunces" : theme === "cursed" ? "VT323" : "Archivo";
-    const mono =
-      theme === "lab" || theme === "console" ? "JetBrains Mono" : "Space Mono";
+    const light = true; // Field Instrument is a light concrete card
+    const display = "Archivo";
+    const mono = "IBM Plex Mono";
 
     const canvas = document.createElement("canvas");
     canvas.width = 1200;
@@ -696,8 +693,8 @@ export default function ExcavationApp() {
     ctx.textBaseline = "alphabetic";
     ctx.textAlign = "left";
     ctx.fillStyle = ink;
-    ctx.font = `800 26px ${display}, sans-serif`;
-    ctx.fillText(theme === "cursed" ? "FOUND IN PI" : "Found in Pi", 48, 74);
+    ctx.font = `900 26px ${display}, sans-serif`;
+    ctx.fillText("◆ FOUND IN PI", 48, 74);
     ctx.textAlign = "right";
     ctx.fillStyle = muted;
     ctx.font = `700 15px ${mono}, monospace`;

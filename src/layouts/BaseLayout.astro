@@ -28,23 +28,11 @@ const ogImage =
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <script is:inline>
-      (function () {
-        try {
-          var t = localStorage.getItem("fip-theme");
-          if (t !== "lab" && t !== "bone" && t !== "cursed" && t !== "console")
-            t = "lab";
-          document.documentElement.dataset.theme = t;
-        } catch (e) {
-          document.documentElement.dataset.theme = "lab";
-        }
-      })();
-    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800;900&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;700&family=Space+Mono:wght@400;700&family=VT323&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap"
     />
     <title>{title}</title>
     <meta name="description" content={description} />
@@ -60,7 +48,7 @@ const ogImage =
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
-    <meta name="theme-color" content="#171814" />
+    <meta name="theme-color" content="#d7d5ce" />
     {
       jsonLd ? (
         <script
@@ -84,40 +72,5 @@ const ogImage =
         Twitter @caffe1neduck
       </a>
     </footer>
-    <div class="version-switch" role="group" aria-label="Design version">
-      <span class="version-switch-label">Theme</span>
-      <button type="button" data-theme-btn="lab">Lab</button>
-      <button type="button" data-theme-btn="bone">Bone</button>
-      <button type="button" data-theme-btn="cursed">Cursed</button>
-      <button type="button" data-theme-btn="console">Console</button>
-    </div>
-    <script is:inline>
-      (function () {
-        var root = document.documentElement;
-        var buttons = Array.prototype.slice.call(
-          document.querySelectorAll("[data-theme-btn]")
-        );
-        function sync() {
-          var current = root.dataset.theme;
-          buttons.forEach(function (button) {
-            button.setAttribute(
-              "aria-pressed",
-              String(button.dataset.themeBtn === current)
-            );
-          });
-        }
-        buttons.forEach(function (button) {
-          button.addEventListener("click", function () {
-            var next = button.dataset.themeBtn;
-            root.dataset.theme = next;
-            try {
-              localStorage.setItem("fip-theme", next);
-            } catch (e) {}
-            sync();
-          });
-        });
-        sync();
-      })();
-    </script>
   </body>
 </html>
