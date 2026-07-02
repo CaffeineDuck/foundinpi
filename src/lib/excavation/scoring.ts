@@ -11,16 +11,37 @@ const CLASS_WEIGHT: Record<TileClass, number> = {
   earth: 0
 };
 
+const DISTANCE_SCORE_MIN = 18;
+const DISTANCE_SCORE_MAX = 58;
+const DISTANCE_SCORE_CURVE = 1.18;
+const MATCH_SCORE_WEIGHT = 0.84;
+
 function rarityFor(score: number) {
-  if (score >= 68) return "Cathedral Grade";
-  if (score >= 50) return "Museum Grade";
-  if (score >= 34) return "Field Relic";
-  if (score >= 18) return "Fragment Cluster";
+  if (score >= 82) return "Cathedral Grade";
+  if (score >= 66) return "Museum Grade";
+  if (score >= 48) return "Field Relic";
+  if (score >= 30) return "Fragment Cluster";
   return "Deep Earth";
 }
 
 function percent(count: number, total: number) {
   return total === 0 ? 0 : Math.round((count / total) * 1000) / 10;
+}
+
+function clamp01(value: number) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function oneDecimal(value: number) {
+  return Math.round(value * 10) / 10;
+}
+
+function distanceQuality(distance: number) {
+  const normalized = clamp01(
+    (DISTANCE_SCORE_MAX - distance) / (DISTANCE_SCORE_MAX - DISTANCE_SCORE_MIN)
+  );
+
+  return Math.pow(normalized, DISTANCE_SCORE_CURVE);
 }
 
 function buildShareGrid(tiles: TileExcavation[]) {
@@ -153,12 +174,14 @@ export function summarizeTiles(
   };
 
   let weighted = 0;
+  let matchQuality = 0;
   let longestRun = 0;
   let currentRun = 0;
 
   for (const tile of tiles) {
     counts[tile.className] += 1;
     weighted += CLASS_WEIGHT[tile.className];
+    matchQuality += distanceQuality(tile.distance);
 
     if (tile.className === "exact" || tile.className === "near") {
       currentRun += 1;
@@ -172,9 +195,11 @@ export function summarizeTiles(
   const nearPct = percent(counts.near, total);
   const lossyPct = percent(counts.lossy, total);
   const earthPct = percent(counts.earth, total);
-  const score = Math.round((weighted / total) * 1000) / 10;
-  const piNative =
-    Math.round((exactPct + nearPct * 0.55 + lossyPct * 0.2) * 10) / 10;
+  const classScore = (weighted / total) * 100;
+  const piNative = oneDecimal((matchQuality / total) * 100);
+  const score = oneDecimal(
+    piNative * MATCH_SCORE_WEIGHT + classScore * (1 - MATCH_SCORE_WEIGHT)
+  );
   const rarity = rarityFor(score);
   const longestFossil = longestRun * DIG_SITE_FRAGMENT_BYTES;
   const seedNumber = hashTiles(tiles, digSite.id);

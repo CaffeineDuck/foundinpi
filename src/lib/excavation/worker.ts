@@ -28,7 +28,6 @@ const SIGNATURE_BUCKETS = 256;
 const MIN_COLOR_CANDIDATES = 160;
 const COLOR_SEARCH_RADIUS = 1;
 const COLOR_FALLBACK_RADIUS = 2;
-const DEEP_SITE_FRAGMENT_THRESHOLD = 1_000_000;
 
 type PiSearchIndex = {
   catalogue: PiCatalogue;
@@ -72,8 +71,8 @@ function fragmentColorDistance(
 
 function classify(distance: number, exactSignature: boolean): TileClass {
   if (exactSignature && distance <= 22) return "exact";
-  if (distance <= 30) return "near";
-  if (distance <= 58) return "lossy";
+  if (distance <= 34) return "near";
+  if (distance <= 52) return "lossy";
   return "earth";
 }
 
@@ -488,12 +487,7 @@ function findNearestPiFragment(
     }
   }
 
-  const colorSearchRadius =
-    catalogue.fragments >= DEEP_SITE_FRAGMENT_THRESHOLD ? 0 : COLOR_SEARCH_RADIUS;
-  const colorFallbackRadius =
-    colorSearchRadius === 0 ? COLOR_SEARCH_RADIUS : COLOR_FALLBACK_RADIUS;
-
-  searchColorBuckets(colorSearchRadius);
+  searchColorBuckets(COLOR_SEARCH_RADIUS);
 
   const signatureKey = signatureBucketKey(signature);
   const signatureStart = signatureBucketStarts[signatureKey];
@@ -507,7 +501,7 @@ function findNearestPiFragment(
   }
 
   if (candidateCount < MIN_COLOR_CANDIDATES) {
-    searchColorBuckets(colorFallbackRadius);
+    searchColorBuckets(COLOR_FALLBACK_RADIUS);
   }
 
   return {
