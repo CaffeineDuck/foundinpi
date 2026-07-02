@@ -1,5 +1,6 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
+import SiteHeader from "../../components/SiteHeader.astro";
 import { env } from "cloudflare:workers";
 import {
   getRelic,
@@ -117,13 +118,7 @@ const jsonLd = relic
   {
     relic ? (
       <main class="result-shell">
-        <header class="result-nav">
-          <a href="/" class="wordmark">Found in Pi</a>
-          <div class="header-links">
-            <a href="/museum">Museum</a>
-            <a href="/random">Random</a>
-          </div>
-        </header>
+        <SiteHeader />
 
         {prevRelic || nextRelic ? (
           <nav class="relic-pager" aria-label="Relic navigation">
@@ -434,9 +429,11 @@ const jsonLd = relic
       </main>
     ) : (
       <main class="missing-shell">
-        <a href="/" class="wordmark">Found in Pi</a>
-        <h1>Relic not found</h1>
-        <a class="primary-link" href="/museum">Open the museum</a>
+        <SiteHeader />
+        <div class="missing-body">
+          <h1>Relic not found</h1>
+          <a class="primary-link" href="/museum">Open the museum</a>
+        </div>
       </main>
     )
   }

@@ -1,5 +1,6 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import SiteHeader from "../components/SiteHeader.astro";
 import { env } from "cloudflare:workers";
 import { listRelics, publicArtifactUrl, type EnvLike } from "../lib/server/store";
 import { MODES } from "../lib/excavation/constants";
@@ -40,8 +41,9 @@ const jsonLd = {
 
 <BaseLayout title={title} description={description} canonical={canonical} jsonLd={jsonLd}>
   <main class="museum-shell">
-    <header class="museum-header">
-      <a href="/" class="wordmark">Found in Pi</a>
+    <SiteHeader />
+
+    <header class="page-head">
       <div class="museum-title">
         <p class="eyebrow">Pi Relic Museum</p>
         <h1>Public excavations</h1>

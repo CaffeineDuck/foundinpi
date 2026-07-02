@@ -1,5 +1,6 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import SiteHeader from "../components/SiteHeader.astro";
 
 const title = "About Found in Pi";
 const description =
@@ -16,13 +17,7 @@ const jsonLd = {
 
 <BaseLayout title={title} description={description} canonical={canonical} jsonLd={jsonLd}>
   <main class="about-shell">
-    <nav class="about-nav" aria-label="About page">
-      <a href="/" class="wordmark">Found in Pi</a>
-      <div class="header-links">
-        <a class="primary-link secondary" href="/museum">Museum</a>
-        <a class="primary-link" href="/">Try it</a>
-      </div>
-    </nav>
+    <SiteHeader />
 
     <section class="about-hero">
       <p class="eyebrow">About</p>
