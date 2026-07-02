@@ -1006,8 +1006,8 @@ export default function ExcavationApp() {
           </div>
 
           <p className="intro-honesty">
-            We only dig through the first million digits of pi, not all of it
-            (nobody can). It&rsquo;s a toy, not real compression.
+            We dig through a finite slice of pi: 1M digits by default, or 10M
+            if you choose Dig Site II. It&rsquo;s a toy, not real compression.
           </p>
         </section>
       ) : (
