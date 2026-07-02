@@ -126,7 +126,7 @@ const BREAKDOWN: ReadonlyArray<{ k: TileClass; label: string }> = [
 
 // plain-language explanation of each match type (used in tooltips)
 const CLASS_TIP: Record<TileClass, string> = {
-  exact: "A very tight pi fragment at this tile scale.",
+  exact: "An extremely tight pi fragment at this tile scale.",
   near: "A close pi fragment with small visual drift.",
   lossy: "A weak pi fragment that still carries the rough shape or color.",
   earth: "No credible pi fit in this dig site; rendered as dark pi-derived fill."

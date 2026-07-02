@@ -28,7 +28,7 @@ const SIGNATURE_BUCKETS = 256;
 const MIN_COLOR_CANDIDATES = 160;
 const COLOR_SEARCH_RADIUS = 1;
 const COLOR_FALLBACK_RADIUS = 2;
-const EXACT_DISTANCE_THRESHOLD = 27;
+const EXACT_DISTANCE_THRESHOLD = 20;
 const EXACT_MIN_SOURCE_CONTRAST = 2;
 const NEAR_DISTANCE_THRESHOLD = 34;
 const LOSSY_DISTANCE_THRESHOLD = 42;
@@ -81,7 +81,7 @@ function classify(
   const sourceContrast =
     Math.max(...sourceSignature) - Math.min(...sourceSignature);
 
-  if (exactSignature && distance <= 22) return "exact";
+  if (exactSignature && distance <= EXACT_DISTANCE_THRESHOLD) return "exact";
   if (
     sourceContrast >= EXACT_MIN_SOURCE_CONTRAST &&
     distance <= EXACT_DISTANCE_THRESHOLD
