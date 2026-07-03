@@ -15,6 +15,7 @@ import {
   ScanSearch,
   Share2,
   Sparkles,
+  Stamp,
   Sun,
   Zap,
   type LucideIcon
@@ -23,6 +24,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_DIG_SITE_ID,
   DIG_SITES,
+  FIELD_STAMPS,
   MODES,
   TILE_CLASS_COLORS,
   TILE_CLASS_LABELS,
@@ -103,7 +105,6 @@ const MODES_IN_ORDER: ExcavationMode[] = [
 ];
 
 const DIG_SITE_STORAGE_KEY = "foundinpi:dig-site";
-const FIELD_NOTE_LIMIT = 64;
 
 // Streamed under the viewport before a specimen is loaded.
 const PI_DIGIT_CHUNKS = [
@@ -429,7 +430,7 @@ ${result.summary.piNative.toFixed(1)}% pi-native
 Longest fossil: ${result.summary.longestFossil} bytes
 Rarity: ${result.summary.rarity}
 ${result.summary.digSite.split(":")[0]}
-${note ? `Field note: ${note}\n` : ""}${result.summary.shareGrid}
+${note ? `“${note}”\n` : ""}${result.summary.shareGrid}
 ${url}`;
 }
 
@@ -444,29 +445,6 @@ function coordinateParts(coordinate: string) {
 
 function artifactPath(key: string) {
   return `/artifacts/${key.split("/").map(encodeURIComponent).join("/")}`;
-}
-
-function cleanFieldNote(note: string) {
-  return note.trim().replace(/\s+/g, " ").slice(0, FIELD_NOTE_LIMIT);
-}
-
-function fieldNoteDraft(note: string) {
-  return note.replace(/[\r\n\t]+/g, " ").slice(0, FIELD_NOTE_LIMIT);
-}
-
-function fitCanvasText(
-  context: CanvasRenderingContext2D,
-  text: string,
-  maxWidth: number
-) {
-  if (context.measureText(text).width <= maxWidth) return text;
-
-  let fitted = text;
-  while (fitted.length > 1 && context.measureText(`${fitted}…`).width > maxWidth) {
-    fitted = fitted.slice(0, -1);
-  }
-
-  return `${fitted.trimEnd()}…`;
 }
 
 function tileAt(
@@ -503,7 +481,7 @@ export default function ExcavationApp() {
     null
   );
   const [shareMsg, setShareMsg] = useState<string | null>(null);
-  const [fieldNote, setFieldNote] = useState("");
+  const [stamp, setStamp] = useState<string | null>(null);
   const [museumRelics, setMuseumRelics] = useState<MuseumShelfRelic[]>([]);
   const [museumShelfLoaded, setMuseumShelfLoaded] = useState(false);
   const [isMobileHeaderHidden, setIsMobileHeaderHidden] = useState(false);
@@ -651,7 +629,7 @@ export default function ExcavationApp() {
       lastY = window.scrollY;
       lowY = lastY;
       peakY = lastY;
-      if (!media.matches || phase === "intro") setHeaderHidden(false);
+      setHeaderHidden(media.matches && phase !== "intro");
     };
 
     const handleScroll = () => {
@@ -763,7 +741,7 @@ export default function ExcavationApp() {
     options?: {
       demo?: boolean;
       digSiteId?: DigSiteId;
-      resetNote?: boolean;
+      resetStamp?: boolean;
       trigger?: ExcavationTrigger;
     }
   ) {
@@ -801,7 +779,7 @@ export default function ExcavationApp() {
     setProgressLabel("Preparing specimen");
     setPublishState({ status: "idle" });
     setShareMsg(null);
-    if (options?.resetNote) setFieldNote("");
+    if (options?.resetStamp) setStamp(null);
     setResult(null);
     setSlider(0);
     lastFileRef.current = file;
@@ -862,7 +840,7 @@ export default function ExcavationApp() {
       void excavate(file, mode, {
         demo: false,
         digSiteId,
-        resetNote: true,
+        resetStamp: true,
         trigger: "upload"
       });
     }
@@ -873,7 +851,7 @@ export default function ExcavationApp() {
     void excavate(file, mode, {
       demo: true,
       digSiteId,
-      resetNote: true,
+      resetStamp: true,
       trigger: "sample"
     });
   }
@@ -961,6 +939,51 @@ export default function ExcavationApp() {
         </div>
       </div>
     );
+  }
+
+  function styleSelector(className = "") {
+    return (
+      <div className={`tool-group ${className}`.trim()}>
+        <span className="tool-group-label">Style — how the dug-up image looks</span>
+        <div className="mode-seg" role="group" aria-label="Reconstruction style">
+          {MODES_IN_ORDER.map((entry) => {
+            const Icon = MODE_ICON[entry];
+            return (
+              <button
+                key={entry}
+                className={entry === mode ? "mode-card active" : "mode-card"}
+                type="button"
+                disabled={isWorking}
+                aria-pressed={entry === mode}
+                title={MODES[entry].label}
+                onClick={() => chooseMode(entry)}
+              >
+                <span className="mode-top">
+                  <Icon size={15} aria-hidden="true" />
+                  {MODES[entry].short}
+                </span>
+                <em>{MODE_DESC[entry]}</em>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  function primaryShareLabel() {
+    if (isDemoSpecimen) return "Upload to share";
+    if (publishState.status === "publishing") return "Publishing...";
+    if (publishState.status === "published") return "Share link";
+    return "Publish & share";
+  }
+
+  function triggerPrimaryShare() {
+    if (isDemoSpecimen) {
+      uploadInputRef.current?.click();
+      return;
+    }
+    void shareRelic();
   }
 
   function handleStageMove(event: React.PointerEvent<HTMLDivElement>) {
@@ -1291,21 +1314,6 @@ export default function ExcavationApp() {
     }
   }
 
-  function downloadRelicImage() {
-    if (!result || !relicCanvas.current) return;
-
-    const anchor = document.createElement("a");
-    anchor.href = relicCanvas.current.toDataURL("image/png");
-    anchor.download = `found-in-pi-${result.summary.seed}-relic.png`;
-    anchor.click();
-    flashShare("Relic image downloaded");
-    capturePostHog("relic_image_downloaded", {
-      source: "excavation_app",
-      relic_id: publishState.status === "published" ? publishState.id : undefined,
-      ...currentAnalytics(resultAnalytics(result))
-    });
-  }
-
   async function copyImage() {
     try {
       const blob = await canvasToBlob(
@@ -1480,13 +1488,14 @@ export default function ExcavationApp() {
                   <button
                     className="stage-download"
                     type="button"
-                    title="Download recovered image"
-                    aria-label="Download recovered image"
+                    title={primaryShareLabel()}
+                    aria-label={primaryShareLabel()}
+                    disabled={publishState.status === "publishing"}
                     onPointerEnter={() => setHoverPoint(null)}
                     onPointerMove={(event) => event.stopPropagation()}
-                    onClick={downloadRelicImage}
+                    onClick={triggerPrimaryShare}
                   >
-                    <Download size={18} aria-hidden="true" />
+                    <Share2 size={18} aria-hidden="true" />
                   </button>
                 ) : null}
                 {isWorking ? (
@@ -1533,32 +1542,9 @@ export default function ExcavationApp() {
             </div>
 
             <div className="stage-tools">
-              {digSiteSelector("dig-site-seg-tools")}
-
-              <div className="tool-group">
-                <span className="tool-group-label">Style — how the dug-up image looks</span>
-                <div className="mode-seg" role="group" aria-label="Reconstruction style">
-                {MODES_IN_ORDER.map((entry) => {
-                  const Icon = MODE_ICON[entry];
-                  return (
-                    <button
-                      key={entry}
-                      className={entry === mode ? "mode-card active" : "mode-card"}
-                      type="button"
-                      disabled={isWorking}
-                      aria-pressed={entry === mode}
-                      title={MODES[entry].label}
-                      onClick={() => chooseMode(entry)}
-                    >
-                      <span className="mode-top">
-                        <Icon size={15} aria-hidden="true" />
-                        {MODES[entry].short}
-                      </span>
-                      <em>{MODE_DESC[entry]}</em>
-                    </button>
-                  );
-                })}
-                </div>
+              <div className="desktop-settings">
+                {digSiteSelector("dig-site-seg-tools")}
+                {styleSelector()}
               </div>
 
               <div className="stage-tool-row">
@@ -1605,6 +1591,47 @@ export default function ExcavationApp() {
                   New
                 </label>
               </div>
+
+              <details className="mobile-settings">
+                <summary>
+                  <SlidersHorizontal size={16} aria-hidden="true" />
+                  Excavation settings
+                </summary>
+                <div className="mobile-settings-body">
+                  {digSiteSelector("dig-site-seg-tools")}
+                  {styleSelector()}
+                  <div className="mobile-settings-actions">
+                    <button
+                      className={heatmapVisible ? "icon-button active" : "icon-button"}
+                      type="button"
+                      disabled={!result}
+                      onClick={() => {
+                        const nextVisible = !heatmapVisible;
+                        setHeatmapVisible(nextVisible);
+                        if (result) {
+                          capturePostHog("excavation_heatmap_toggled", {
+                            source: "excavation_app",
+                            visible: nextVisible,
+                            ...currentAnalytics(resultAnalytics(result))
+                          });
+                        }
+                      }}
+                    >
+                      <Grid3X3 size={16} aria-hidden="true" />
+                      Heatmap
+                    </button>
+                    <label className="icon-button new-image">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(event) => handleFileList(event.currentTarget.files)}
+                      />
+                      <ImagePlus size={16} aria-hidden="true" />
+                      New image
+                    </label>
+                  </div>
+                </div>
+              </details>
             </div>
           </div>
 

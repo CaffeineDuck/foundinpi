@@ -640,6 +640,11 @@ p {
   transform: translateY(1px);
 }
 
+.stage-download:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
 .scan-overlay {
   position: absolute;
   inset: 0;
@@ -778,6 +783,15 @@ p {
   display: grid;
   gap: 14px;
   margin-top: 2px;
+}
+
+.desktop-settings {
+  display: grid;
+  gap: 14px;
+}
+
+.mobile-settings {
+  display: none;
 }
 
 .tool-group {
@@ -2762,8 +2776,13 @@ p {
     padding-bottom: 90px;
   }
 
+  .app[data-phase="scanning"],
+  .app[data-phase="relic"] {
+    padding-top: 0;
+  }
+
   .app[data-mobile-header="hidden"] {
-    --mobile-stage-top: 10px;
+    --mobile-stage-top: 8px;
   }
 
   .museum-strip {
@@ -2780,7 +2799,7 @@ p {
     scroll-snap-align: start;
   }
 
-  .app-bar {
+  .app > .app-bar {
     position: fixed;
     top: 8px;
     right: 12px;
@@ -2793,7 +2812,7 @@ p {
     will-change: transform;
   }
 
-  .app-bar[data-mobile-hidden="true"] {
+  .app > .app-bar[data-mobile-hidden="true"] {
     opacity: 0;
     pointer-events: none;
     transform: translateY(calc(-100% - 12px));
@@ -2844,7 +2863,7 @@ p {
     align-items: center;
     justify-content: center;
     margin-inline: calc(50% - 50vw);
-    padding: 8px 12px 10px;
+    padding: 6px 12px 8px;
     border-block: 1px solid rgb(160 157 144 / 0.62);
     background:
       linear-gradient(
@@ -2857,30 +2876,22 @@ p {
       0 18px 34px rgb(38 34 26 / 0.2),
       inset 0 1px 0 rgb(255 255 255 / 0.72);
     isolation: isolate;
-    transition: top 0.22s ease, padding 0.22s ease, box-shadow 0.22s ease;
+    transition: box-shadow 0.22s ease;
   }
 
   .stage {
     flex: 0 1 auto;
-    width: min(100%, 366px);
-    max-height: min(48svh, 360px);
-    transition: width 0.22s ease, max-height 0.22s ease,
-      box-shadow 0.22s ease;
+    width: min(100%, 320px);
+    max-height: min(38svh, 276px);
+    transition: box-shadow 0.22s ease;
   }
 
   .app[data-mobile-header="hidden"] .stage-dock {
-    padding-top: 6px;
-    padding-bottom: 6px;
     box-shadow:
       0 1px 0 rgb(255 255 255 / 0.72),
       0 16px 28px rgb(38 34 26 / 0.22),
       0 1px 0 rgb(255 77 0 / 0.18),
       inset 0 1px 0 rgb(255 255 255 / 0.72);
-  }
-
-  .app[data-mobile-header="hidden"] .stage {
-    width: min(76vw, 300px);
-    max-height: min(31svh, 226px);
   }
 
   .stage-badges {
@@ -2896,6 +2907,7 @@ p {
   }
 
   .tile-popover {
+    display: none;
     right: 8px;
     bottom: 8px;
     min-width: min(190px, calc(100% - 16px));
@@ -2903,6 +2915,75 @@ p {
 
   .stage-tools {
     gap: 10px;
+  }
+
+  .desktop-settings {
+    display: none;
+  }
+
+  .mobile-settings {
+    display: block;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: 0 10px 24px rgb(38 34 26 / 0.08);
+  }
+
+  .mobile-settings summary {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 46px;
+    padding: 0 14px;
+    color: var(--ink);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    list-style: none;
+    text-transform: uppercase;
+  }
+
+  .mobile-settings summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .mobile-settings summary::after {
+    content: "+";
+    margin-left: auto;
+    color: var(--accent);
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  .mobile-settings[open] summary {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .mobile-settings[open] summary::after {
+    content: "-";
+  }
+
+  .mobile-settings-body {
+    display: none;
+    gap: 13px;
+    padding: 13px;
+  }
+
+  .mobile-settings[open] .mobile-settings-body {
+    display: grid;
+  }
+
+  .mobile-settings-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .stage-tool-row > .icon-button,
+  .stage-tool-row > .new-image {
+    display: none;
   }
 
   .page-head {
