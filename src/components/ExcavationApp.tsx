@@ -446,6 +446,7 @@ export default function ExcavationApp() {
   const [fieldNote, setFieldNote] = useState("");
   const [museumRelics, setMuseumRelics] = useState<MuseumShelfRelic[]>([]);
   const [museumShelfLoaded, setMuseumShelfLoaded] = useState(false);
+  const [isMobileHeaderHidden, setIsMobileHeaderHidden] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isDemoSpecimen, setIsDemoSpecimen] = useState(false);
   const shareMsgTimer = useRef<number | null>(null);
@@ -539,6 +540,48 @@ export default function ExcavationApp() {
       cancelled = true;
     };
   }, [museumShelfLoaded, phase]);
+
+  useEffect(() => {
+    let lastY = window.scrollY;
+    let frame = 0;
+    const media = window.matchMedia("(max-width: 620px)");
+
+    const reset = () => {
+      lastY = window.scrollY;
+      if (!media.matches || phase === "intro") setIsMobileHeaderHidden(false);
+    };
+
+    const handleScroll = () => {
+      if (frame) return;
+
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        const nextY = Math.max(0, window.scrollY);
+
+        if (!media.matches || phase === "intro" || nextY < 72) {
+          setIsMobileHeaderHidden(false);
+          lastY = nextY;
+          return;
+        }
+
+        const delta = nextY - lastY;
+        if (Math.abs(delta) < 8) return;
+
+        setIsMobileHeaderHidden(delta > 0);
+        lastY = nextY;
+      });
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    media.addEventListener("change", reset);
+    reset();
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      media.removeEventListener("change", reset);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, [phase]);
 
   function createWorker() {
     const worker = new Worker(
@@ -1044,8 +1087,16 @@ export default function ExcavationApp() {
   }
 
   return (
-    <div className="app" data-phase={phase} aria-label="Found in Pi excavation app">
-      <header className="app-bar screws">
+    <div
+      className="app"
+      data-phase={phase}
+      data-mobile-header={isMobileHeaderHidden ? "hidden" : "shown"}
+      aria-label="Found in Pi excavation app"
+    >
+      <header
+        className="app-bar screws"
+        data-mobile-hidden={isMobileHeaderHidden ? "true" : "false"}
+      >
         <a className="wordmark" href="/">
           Found in Pi
         </a>
@@ -1588,16 +1639,6 @@ export default function ExcavationApp() {
             <div>
               <p className="eyebrow">Museum shelf</p>
               <h2>What else surfaced</h2>
-            </div>
-            <div className="museum-shelf-actions">
-              <a href="/museum">
-                <Eye size={15} aria-hidden="true" />
-                Museum
-              </a>
-              <a href="/random">
-                <Shuffle size={15} aria-hidden="true" />
-                Random
-              </a>
             </div>
           </div>
 

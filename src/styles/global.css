@@ -1024,39 +1024,6 @@ p {
   text-transform: uppercase;
 }
 
-.museum-shelf-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.museum-shelf-actions a {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 34px;
-  padding: 0 11px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--ink-dim);
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-decoration: none;
-  text-transform: uppercase;
-  transition: border-color 0.16s ease, color 0.16s ease, transform 0.12s ease;
-}
-
-.museum-shelf-actions a:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.museum-shelf-actions a:active {
-  transform: translateY(1px);
-}
-
 .museum-strip {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -2786,17 +2753,13 @@ p {
   }
 
   .app {
+    --mobile-stage-top: 64px;
+    padding-top: 58px;
     padding-bottom: 90px;
   }
 
-  .museum-shelf-head {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .museum-shelf-actions a {
-    flex: 1;
-    justify-content: center;
+  .app[data-mobile-header="hidden"] {
+    --mobile-stage-top: 10px;
   }
 
   .museum-strip {
@@ -2813,27 +2776,90 @@ p {
     scroll-snap-align: start;
   }
 
-  /* faceplate header stacks so nothing gets clipped on phones */
   .app-bar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-    padding: 12px 14px;
+    position: fixed;
+    top: 8px;
+    right: 12px;
+    left: 12px;
+    z-index: 70;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    transition: transform 0.22s ease, opacity 0.18s ease;
+    will-change: transform;
+  }
+
+  .app-bar[data-mobile-hidden="true"] {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(calc(-100% - 12px));
   }
 
   .wordmark {
-    font-size: 1.02rem;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 0.9rem;
+    text-overflow: ellipsis;
   }
 
   .app-nav {
+    flex: 0 0 auto;
     gap: 6px;
+    margin-left: auto;
   }
 
   .app-nav a {
-    flex: 1;
+    width: 36px;
+    height: 34px;
     justify-content: center;
-    padding: 9px 4px;
+    gap: 0;
+    padding: 0;
     border-color: var(--line);
+    font-size: 0;
+  }
+
+  .app-nav a svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .workbench {
+    gap: 12px;
+    margin-top: 8px;
+  }
+
+  .stage-col {
+    display: contents;
+  }
+
+  .stage {
+    position: sticky;
+    top: var(--mobile-stage-top);
+    z-index: 35;
+    max-height: min(48svh, 360px);
+    transition: top 0.22s ease;
+  }
+
+  .stage-badges {
+    top: 8px;
+    left: 8px;
+  }
+
+  .stage-download {
+    top: 8px;
+    right: 8px;
+    width: 38px;
+    height: 38px;
+  }
+
+  .tile-popover {
+    right: 8px;
+    bottom: 8px;
+    min-width: min(190px, calc(100% - 16px));
+  }
+
+  .stage-tools {
+    gap: 10px;
   }
 
   .page-head {
