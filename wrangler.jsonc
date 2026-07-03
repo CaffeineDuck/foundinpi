@@ -24,6 +24,12 @@
   "observability": {
     "enabled": true
   },
+  "vars": {
+    "PUBLIC_POSTHOG_HOST": "/ingest",
+    "PUBLIC_POSTHOG_UI_HOST": "https://us.posthog.com",
+    "POSTHOG_HOST": "https://us.i.posthog.com",
+    "POSTHOG_ASSET_HOST": "https://us-assets.i.posthog.com"
+  },
   "d1_databases": [
     {
       "binding": "DB",

@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
 import { createRelic, listRelics, type EnvLike } from "../../lib/server/store";
 import type { PublishRelicInput } from "../../lib/server/types";
+import { getPostHogServer } from "../../lib/posthog-server";
 
 export const prerender = false;
 const cfEnv = env as EnvLike;
@@ -64,6 +65,26 @@ export const POST: APIRoute = async ({ request }) => {
           url: `/r/${result.nearMatch.relic.id}`
         }
       : null;
+
+    const sessionId = request.headers.get("X-PostHog-Session-Id");
+    const clientDistinctId = request.headers.get("X-PostHog-Distinct-Id");
+    const posthog = getPostHogServer();
+    posthog?.capture({
+      distinctId: clientDistinctId || result.relic.id,
+      event: "relic_published",
+      properties: {
+        ...(sessionId ? { $session_id: sessionId } : {}),
+        relic_id: result.relic.id,
+        mode: result.relic.mode,
+        rarity: result.relic.rarity,
+        pi_native: result.relic.piNative,
+        dig_site: result.relic.digSite,
+        longest_fossil: result.relic.longestFossil,
+        score: result.relic.score,
+        has_note: !!result.relic.note,
+        is_duplicate: result.duplicate,
+      },
+    });
 
     return Response.json({
       relic: result.relic,

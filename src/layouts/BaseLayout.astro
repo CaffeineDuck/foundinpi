@@ -1,5 +1,6 @@
 ---
 import "../styles/global.css";
+import PostHog from "../components/posthog.astro";
 
 type Props = {
   title: string;
@@ -53,6 +54,7 @@ const ogImage =
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
     <meta name="theme-color" content="#d7d5ce" />
+    <PostHog />
     {
       jsonLd ? (
         <script

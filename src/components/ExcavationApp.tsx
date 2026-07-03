@@ -26,6 +26,7 @@ import {
   MODES,
   TILE_CLASS_COLORS,
   TILE_CLASS_LABELS,
+  type DigSite,
   type DigSiteId
 } from "../lib/excavation/constants";
 import type {
@@ -36,6 +37,16 @@ import type {
   WorkerResponse
 } from "../lib/excavation/types";
 import "../styles/dig-site.css";
+
+declare global {
+  interface Window {
+    posthog?: {
+      capture: (event: string, properties?: Record<string, unknown>) => void;
+      get_session_id?: () => string | null;
+      get_distinct_id?: () => string | null;
+    };
+  }
+}
 
 type PublishState =
   | { status: "idle" }
@@ -80,6 +91,9 @@ type MuseumShelfRelic = {
   artifactKey: string;
 };
 
+type AnalyticsProperties = Record<string, unknown>;
+type ExcavationTrigger = "upload" | "sample" | "mode_change" | "dig_site_change";
+
 const MODES_IN_ORDER: ExcavationMode[] = [
   "museum",
   "deep",
@@ -104,6 +118,52 @@ const PI_DIGIT_CHUNKS = [
   "86280 34825",
   "34211 70679"
 ];
+
+function capturePostHog(event: string, properties: AnalyticsProperties = {}) {
+  if (typeof window === "undefined") return;
+  window.posthog?.capture(event, properties);
+}
+
+function modeAnalytics(mode: ExcavationMode, prefix = "mode"): AnalyticsProperties {
+  return {
+    [prefix]: mode,
+    [`${prefix}_label`]: MODES[mode].label
+  };
+}
+
+function digSiteAnalytics(site: DigSite, prefix = "dig_site"): AnalyticsProperties {
+  return {
+    [`${prefix}_id`]: site.id,
+    [`${prefix}_label`]: site.label,
+    [`${prefix}_short_label`]: site.shortLabel,
+    [`${prefix}_depth`]: site.depthLabel,
+    [`${prefix}_index_version`]: site.indexVersion,
+    [`${prefix}_radix`]: site.radix,
+    [`${prefix}_digits`]: site.digits,
+    [`${prefix}_indexed_fragments`]: site.indexedFragments
+  };
+}
+
+function resultAnalytics(result: ExcavationResult): AnalyticsProperties {
+  return {
+    result_seed: result.summary.seed,
+    rarity: result.summary.rarity,
+    score: result.summary.score,
+    pi_native: result.summary.piNative,
+    exact_pct: result.summary.exactPct,
+    near_pct: result.summary.nearPct,
+    lossy_pct: result.summary.lossyPct,
+    earth_pct: result.summary.earthPct,
+    longest_fossil: result.summary.longestFossil,
+    searched_digits: result.summary.searchedDigits,
+    indexed_fragments: result.summary.indexedFragments,
+    result_dig_site: result.summary.digSite,
+    result_index_version: result.summary.indexVersion,
+    image_width: result.width,
+    image_height: result.height,
+    tile_count: result.tiles.length
+  };
+}
 
 // One-line character notes for each reconstruction mode.
 const MODE_DESC: Record<ExcavationMode, string> = {
@@ -459,6 +519,7 @@ export default function ExcavationApp() {
   const lastFileRef = useRef<File | null>(null);
   const lastIsDemoRef = useRef(false);
   const activeJobIdRef = useRef(0);
+  const activeJobAnalyticsRef = useRef<AnalyticsProperties | null>(null);
   const workingRef = useRef(false);
 
   const activeTile = useMemo(
@@ -473,6 +534,38 @@ export default function ExcavationApp() {
   const stageState = isWorking ? "working" : result ? "ready" : "idle";
   const phase: "intro" | "scanning" | "relic" =
     !sourceUrl && !isWorking ? "intro" : result && !isWorking ? "relic" : "scanning";
+
+  function currentAnalytics(extra: AnalyticsProperties = {}) {
+    return {
+      ...modeAnalytics(mode),
+      ...digSiteAnalytics(activeDigSite),
+      has_result: Boolean(result),
+      has_specimen: Boolean(lastFileRef.current),
+      is_demo: isDemoSpecimen,
+      ...extra
+    };
+  }
+
+  function publicJobAnalytics(meta: AnalyticsProperties) {
+    const { started_at_ms: _startedAt, ...properties } = meta;
+    return properties;
+  }
+
+  function captureExcavationFailure(
+    stage: string,
+    message: string,
+    fallback: AnalyticsProperties = {}
+  ) {
+    const meta = activeJobAnalyticsRef.current;
+    const startedAt = Number(meta?.started_at_ms ?? fallback.started_at_ms);
+    capturePostHog("excavation_failed", {
+      ...(meta ? publicJobAnalytics(meta) : publicJobAnalytics(fallback)),
+      stage,
+      message,
+      elapsed_ms: Number.isFinite(startedAt) ? Date.now() - startedAt : undefined
+    });
+    activeJobAnalyticsRef.current = null;
+  }
 
   const coordItems = useMemo(() => {
     if (result) {
@@ -601,11 +694,20 @@ export default function ExcavationApp() {
       workingRef.current = false;
 
       if (event.data.type === "error") {
+        captureExcavationFailure("worker", event.data.message);
         setIsWorking(false);
         setProgressLabel(event.data.message);
         return;
       }
 
+      const meta = activeJobAnalyticsRef.current;
+      const startedAt = Number(meta?.started_at_ms);
+      capturePostHog("excavation_completed", {
+        ...(meta ? publicJobAnalytics(meta) : {}),
+        ...resultAnalytics(event.data.result),
+        elapsed_ms: Number.isFinite(startedAt) ? Date.now() - startedAt : undefined
+      });
+      activeJobAnalyticsRef.current = null;
       setProgress(1);
       setProgressLabel("Relic cataloged");
       setResult(event.data.result);
@@ -630,16 +732,42 @@ export default function ExcavationApp() {
   async function excavate(
     file: File,
     nextMode = mode,
-    options?: { demo?: boolean; digSiteId?: DigSiteId; resetNote?: boolean }
+    options?: {
+      demo?: boolean;
+      digSiteId?: DigSiteId;
+      resetNote?: boolean;
+      trigger?: ExcavationTrigger;
+    }
   ) {
+    const trigger = options?.trigger ?? "upload";
+    const isDemo = options?.demo ?? lastIsDemoRef.current;
+    const selectedDigSite =
+      DIG_SITES.find((site) => site.id === options?.digSiteId) ?? activeDigSite;
+    const hadPriorResult = Boolean(result);
+    const hadPriorSpecimen = Boolean(lastFileRef.current);
+    const startedAt = Date.now();
+    const baseAnalytics = {
+      trigger,
+      ...modeAnalytics(nextMode),
+      ...digSiteAnalytics(selectedDigSite),
+      is_demo: isDemo,
+      is_reexcavation: trigger === "mode_change" || trigger === "dig_site_change",
+      had_prior_result: hadPriorResult,
+      had_prior_specimen: hadPriorSpecimen,
+      file_type: file.type || "unknown",
+      file_size_bytes: file.size,
+      started_at_ms: startedAt
+    };
+
     if (!file.type.startsWith("image/")) {
+      capturePostHog("excavation_rejected", {
+        ...publicJobAnalytics(baseAnalytics),
+        reason: "unsupported_file_type"
+      });
       setProgressLabel("Choose an image file");
       return;
     }
 
-    const isDemo = options?.demo ?? lastIsDemoRef.current;
-    const selectedDigSite =
-      DIG_SITES.find((site) => site.id === options?.digSiteId) ?? activeDigSite;
     setIsWorking(true);
     setProgress(0.03);
     setProgressLabel("Preparing specimen");
@@ -666,6 +794,15 @@ export default function ExcavationApp() {
 
       const jobId = activeJobIdRef.current + 1;
       activeJobIdRef.current = jobId;
+      const jobAnalytics = {
+        ...baseAnalytics,
+        job_id: jobId,
+        image_width: prepared.width,
+        image_height: prepared.height,
+        tile_size: tileSize
+      };
+      activeJobAnalyticsRef.current = jobAnalytics;
+      capturePostHog("excavation_started", publicJobAnalytics(jobAnalytics));
       const worker = getWorker();
       workingRef.current = true;
 
@@ -684,24 +821,49 @@ export default function ExcavationApp() {
     } catch (error) {
       workingRef.current = false;
       setIsWorking(false);
-      setProgressLabel(
-        error instanceof Error ? error.message : "Unable to excavate image"
-      );
+      const message =
+        error instanceof Error ? error.message : "Unable to excavate image";
+      captureExcavationFailure("preparation", message, baseAnalytics);
+      setProgressLabel(message);
     }
   }
 
   function handleFileList(files: FileList | null) {
     const file = files?.[0];
-    if (file) void excavate(file, mode, { demo: false, digSiteId, resetNote: true });
+    if (file) {
+      void excavate(file, mode, {
+        demo: false,
+        digSiteId,
+        resetNote: true,
+        trigger: "upload"
+      });
+    }
   }
 
   async function excavateSample() {
     const file = await sampleFile();
-    void excavate(file, mode, { demo: true, digSiteId, resetNote: true });
+    void excavate(file, mode, {
+      demo: true,
+      digSiteId,
+      resetNote: true,
+      trigger: "sample"
+    });
   }
 
   function chooseDigSite(nextDigSiteId: DigSiteId) {
     if (nextDigSiteId === digSiteId) return;
+
+    const nextDigSite =
+      DIG_SITES.find((site) => site.id === nextDigSiteId) ?? activeDigSite;
+    capturePostHog("dig_site_changed", {
+      ...modeAnalytics(mode),
+      ...digSiteAnalytics(nextDigSite),
+      ...digSiteAnalytics(activeDigSite, "previous_dig_site"),
+      has_result: Boolean(result),
+      has_specimen: Boolean(lastFileRef.current),
+      will_reexcavate: Boolean(lastFileRef.current),
+      is_demo: lastIsDemoRef.current
+    });
 
     setDigSiteId(nextDigSiteId);
     window.localStorage.setItem(DIG_SITE_STORAGE_KEY, nextDigSiteId);
@@ -709,7 +871,31 @@ export default function ExcavationApp() {
     if (lastFileRef.current) {
       void excavate(lastFileRef.current, mode, {
         demo: lastIsDemoRef.current,
-        digSiteId: nextDigSiteId
+        digSiteId: nextDigSiteId,
+        trigger: "dig_site_change"
+      });
+    }
+  }
+
+  function chooseMode(nextMode: ExcavationMode) {
+    if (nextMode === mode) return;
+
+    capturePostHog("excavation_mode_changed", {
+      ...modeAnalytics(nextMode),
+      ...modeAnalytics(mode, "previous_mode"),
+      ...digSiteAnalytics(activeDigSite),
+      has_result: Boolean(result),
+      has_specimen: Boolean(lastFileRef.current),
+      will_reexcavate: Boolean(lastFileRef.current),
+      is_demo: lastIsDemoRef.current
+    });
+
+    setMode(nextMode);
+    if (lastFileRef.current) {
+      void excavate(lastFileRef.current, nextMode, {
+        demo: lastIsDemoRef.current,
+        digSiteId,
+        trigger: "mode_change"
       });
     }
   }
@@ -967,9 +1153,15 @@ export default function ExcavationApp() {
       const note = cleanFieldNote(fieldNote);
       const cardImage = await renderCardDataUrl(note);
       const relicImage = relicCanvas.current.toDataURL("image/png");
+      const sessionId = window.posthog?.get_session_id?.() ?? null;
+      const distinctId = window.posthog?.get_distinct_id?.() ?? null;
       const response = await fetch("/api/relics", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...(sessionId ? { "X-PostHog-Session-Id": sessionId } : {}),
+          ...(distinctId ? { "X-PostHog-Distinct-Id": distinctId } : {}),
+        },
         body: JSON.stringify({
           title: result.summary.relicName,
           note,
@@ -1016,6 +1208,13 @@ export default function ExcavationApp() {
     if (!result) return;
     const published = await publish();
     if (!published) return; // demo / error is surfaced through publishState
+
+    capturePostHog("relic_shared", {
+      source: "excavation_app",
+      relic_id: published.id,
+      ...currentAnalytics(resultAnalytics(result)),
+    });
+
     const text = buildShareText(
       result,
       published.url,
@@ -1054,6 +1253,11 @@ export default function ExcavationApp() {
       anchor.download = `found-in-pi-${result?.summary.seed ?? "relic"}.png`;
       anchor.click();
       flashShare("Card downloaded");
+      capturePostHog("relic_card_downloaded", {
+        source: "excavation_app",
+        relic_id: publishState.status === "published" ? publishState.id : undefined,
+        ...currentAnalytics(result ? resultAnalytics(result) : {}),
+      });
     } catch {
       flashShare("Could not render card");
     }
@@ -1067,6 +1271,11 @@ export default function ExcavationApp() {
     anchor.download = `found-in-pi-${result.summary.seed}-relic.png`;
     anchor.click();
     flashShare("Relic image downloaded");
+    capturePostHog("relic_image_downloaded", {
+      source: "excavation_app",
+      relic_id: publishState.status === "published" ? publishState.id : undefined,
+      ...currentAnalytics(resultAnalytics(result))
+    });
   }
 
   async function copyImage() {
@@ -1081,6 +1290,11 @@ export default function ExcavationApp() {
         new ClipboardItem({ "image/png": blob })
       ]);
       flashShare("Card image copied");
+      capturePostHog("relic_card_copied", {
+        source: "excavation_app",
+        relic_id: publishState.status === "published" ? publishState.id : undefined,
+        ...currentAnalytics(result ? resultAnalytics(result) : {}),
+      });
     } catch {
       flashShare("Copy image unsupported — use Download");
     }
@@ -1304,15 +1518,7 @@ export default function ExcavationApp() {
                       disabled={isWorking}
                       aria-pressed={entry === mode}
                       title={MODES[entry].label}
-                      onClick={() => {
-                        setMode(entry);
-                        if (lastFileRef.current) {
-                          void excavate(lastFileRef.current, entry, {
-                            demo: lastIsDemoRef.current,
-                            digSiteId
-                          });
-                        }
-                      }}
+                      onClick={() => chooseMode(entry)}
                     >
                       <span className="mode-top">
                         <Icon size={15} aria-hidden="true" />
@@ -1344,7 +1550,17 @@ export default function ExcavationApp() {
                   className={heatmapVisible ? "icon-button active" : "icon-button"}
                   type="button"
                   disabled={!result}
-                  onClick={() => setHeatmapVisible((value) => !value)}
+                  onClick={() => {
+                    const nextVisible = !heatmapVisible;
+                    setHeatmapVisible(nextVisible);
+                    if (result) {
+                      capturePostHog("excavation_heatmap_toggled", {
+                        source: "excavation_app",
+                        visible: nextVisible,
+                        ...currentAnalytics(resultAnalytics(result))
+                      });
+                    }
+                  }}
                 >
                   <Grid3X3 size={16} aria-hidden="true" />
                   Heat
@@ -1506,6 +1722,14 @@ export default function ExcavationApp() {
                       href={publishState.url}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() =>
+                        capturePostHog("published_relic_link_clicked", {
+                          source: "excavation_app",
+                          relic_id: publishState.id,
+                          is_duplicate: publishState.duplicate,
+                          ...currentAnalytics(result ? resultAnalytics(result) : {})
+                        })
+                      }
                     >
                       <Link size={13} aria-hidden="true" />
                       <span>
@@ -1522,6 +1746,15 @@ export default function ExcavationApp() {
                       href={publishState.nearMatch.url}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() =>
+                        capturePostHog("near_match_clicked", {
+                          source: "excavation_app",
+                          relic_id: publishState.id,
+                          matched_relic_id: publishState.nearMatch?.relic.id,
+                          similarity: publishState.nearMatch?.similarity,
+                          ...currentAnalytics(result ? resultAnalytics(result) : {})
+                        })
+                      }
                     >
                       <Sparkles size={13} aria-hidden="true" />
                       Nearest museum match: {publishState.nearMatch.relic.title} ·{" "}
@@ -1643,8 +1876,23 @@ export default function ExcavationApp() {
           </div>
 
           <div className="museum-strip">
-            {museumRelics.map((relic) => (
-              <a className="museum-strip-card" href={`/r/${relic.id}`} key={relic.id}>
+            {museumRelics.map((relic, index) => (
+              <a
+                className="museum-strip-card"
+                href={`/r/${relic.id}`}
+                key={relic.id}
+                onClick={() =>
+                  capturePostHog("museum_relic_clicked", {
+                    source: "excavation_app_shelf",
+                    relic_id: relic.id,
+                    shelf_position: index + 1,
+                    rarity: relic.rarity,
+                    pi_native: relic.piNative,
+                    views: relic.views,
+                    ...currentAnalytics(result ? resultAnalytics(result) : {})
+                  })
+                }
+              >
                 <img
                   src={artifactPath(relic.artifactKey)}
                   alt={`${relic.title} pi relic`}

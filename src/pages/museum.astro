@@ -55,8 +55,12 @@ const jsonLd = {
         ) : null}
       </div>
       <div class="header-links">
-        <a class="primary-link secondary" href="/random">Random relic</a>
-        <a class="primary-link" href="/">Excavate your image</a>
+        <a class="primary-link secondary" href="/random" data-museum-cta="random">
+          Random relic
+        </a>
+        <a class="primary-link" href="/" data-museum-cta="excavate">
+          Excavate your image
+        </a>
       </div>
     </header>
 
@@ -105,6 +109,9 @@ const jsonLd = {
                 data-score={relic.score}
                 data-pinative={relic.piNative}
                 data-created={relic.createdAt}
+                data-relic-id={relic.id}
+                data-mode={relic.mode}
+                data-dig-site={relic.digSite.split(":")[0]}
               >
                 <div class="relic-card-plate">
                   <span class="relic-card-no">FIP-{relic.id}</span>
@@ -136,8 +143,23 @@ const jsonLd = {
             No relics match this rarity yet.
           </p>
 
-          <script is:inline>
+          <script
+            is:inline
+            define:vars={{
+              relicCount: relics.length,
+              totalViews,
+              digSiteSummary,
+              presentRarities
+            }}
+          >
             (function () {
+              function capture(event, properties) {
+                window.posthog?.capture(event, {
+                  source: "museum_page",
+                  ...properties
+                });
+              }
+
               const grid = document.querySelector(".relic-grid");
               if (!grid) return;
               const cards = Array.prototype.slice.call(
@@ -149,8 +171,22 @@ const jsonLd = {
               let sortKey = "views";
               let rarity = "all";
 
+              capture("museum_viewed", {
+                relic_count: relicCount,
+                total_views: totalViews,
+                dig_site_summary: digSiteSummary,
+                rarity_count: presentRarities.length,
+                rarities: presentRarities
+              });
+
               function num(el, key) {
                 return Number(el.dataset[key] || 0);
+              }
+
+              function visibleCount() {
+                return cards.filter(function (card) {
+                  return rarity === "all" || card.dataset.rarity === rarity;
+                }).length;
               }
 
               function render() {
@@ -192,6 +228,11 @@ const jsonLd = {
                       other.classList.toggle("active", other === button);
                     });
                   render();
+                  capture("museum_sorted", {
+                    sort: sortKey,
+                    filter: rarity,
+                    visible_count: visibleCount()
+                  });
                 });
               });
 
@@ -204,6 +245,38 @@ const jsonLd = {
                       other.classList.toggle("active", other === button);
                     });
                   render();
+                  capture("museum_filtered", {
+                    filter: rarity,
+                    sort: sortKey,
+                    visible_count: visibleCount()
+                  });
+                });
+              });
+
+              cards.forEach(function (card, index) {
+                card.addEventListener("click", function () {
+                  capture("museum_relic_clicked", {
+                    relic_id: card.dataset.relicId,
+                    rarity: card.dataset.rarity,
+                    mode: card.dataset.mode,
+                    dig_site: card.dataset.digSite,
+                    pi_native: Number(card.dataset.pinative || 0),
+                    score: Number(card.dataset.score || 0),
+                    views: Number(card.dataset.views || 0),
+                    card_position: index + 1,
+                    sort: sortKey,
+                    filter: rarity
+                  });
+                });
+              });
+
+              document.querySelectorAll("[data-museum-cta]").forEach(function (link) {
+                link.addEventListener("click", function () {
+                  capture("museum_cta_clicked", {
+                    cta: link.dataset.museumCta,
+                    sort: sortKey,
+                    filter: rarity
+                  });
                 });
               });
 

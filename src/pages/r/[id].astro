@@ -107,6 +107,21 @@ const jsonLd = relic
       }
     }
   : undefined;
+const relicAnalytics = relic
+  ? {
+      relic_id: relic.id,
+      rarity: relic.rarity,
+      mode: relic.mode,
+      mode_label: modeLabel,
+      dig_site: digShort,
+      dig_site_label: relic.digSite,
+      score: relic.score,
+      pi_native: relic.piNative,
+      longest_fossil: relic.longestFossil,
+      views: relic.views,
+      has_note: Boolean(relicNote)
+    }
+  : {};
 ---
 
 <BaseLayout
@@ -125,7 +140,12 @@ const jsonLd = relic
         {prevRelic || nextRelic ? (
           <nav class="relic-pager" aria-label="Relic navigation">
             {prevRelic ? (
-              <a class="pager-link prev" href={`/r/${prevRelic.id}`}>
+              <a
+                class="pager-link prev"
+                href={`/r/${prevRelic.id}`}
+                data-relic-nav="previous"
+                data-target-relic-id={prevRelic.id}
+              >
                 <span class="pager-arrow">←</span>
                 <span class="pager-meta">
                   <em>Previous</em>
@@ -135,9 +155,16 @@ const jsonLd = relic
             ) : (
               <span class="pager-spacer" />
             )}
-            <a class="pager-random" href="/random">Random relic</a>
+            <a class="pager-random" href="/random" data-relic-nav="random">
+              Random relic
+            </a>
             {nextRelic ? (
-              <a class="pager-link next" href={`/r/${nextRelic.id}`}>
+              <a
+                class="pager-link next"
+                href={`/r/${nextRelic.id}`}
+                data-relic-nav="next"
+                data-target-relic-id={nextRelic.id}
+              >
                 <span class="pager-meta">
                   <em>Next</em>
                   <strong>{nextRelic.title}</strong>
@@ -278,7 +305,14 @@ const jsonLd = relic
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
                 <span data-copy-label>Copy link</span>
               </button>
-              <a class="share-opt" href={cardUrl} download={`found-in-pi-${relic.id}.png`} title="Download the relic card" aria-label="Download the relic card">
+              <a
+                class="share-opt"
+                href={cardUrl}
+                download={`found-in-pi-${relic.id}.png`}
+                title="Download the relic card"
+                aria-label="Download the relic card"
+                data-download-card
+              >
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
               </a>
             </div>
@@ -288,7 +322,9 @@ const jsonLd = relic
               excavation scores, not compression claims.
             </p>
 
-            <a class="primary-link" href="/">Excavate your own image</a>
+            <a class="primary-link" href="/" data-relic-cta="excavate">
+              Excavate your own image
+            </a>
           </article>
         </section>
 
@@ -296,11 +332,18 @@ const jsonLd = relic
           <section class="more">
             <div class="more-head">
               <h2>More from the museum</h2>
-              <a href="/museum">All excavations →</a>
+              <a href="/museum" data-relic-cta="museum">All excavations →</a>
             </div>
             <div class="relic-grid">
-              {more.map((entry) => (
-                <a class="relic-card" href={`/r/${entry.id}`}>
+              {more.map((entry, index) => (
+                <a
+                  class="relic-card"
+                  href={`/r/${entry.id}`}
+                  data-related-relic-id={entry.id}
+                  data-related-position={index + 1}
+                  data-related-rarity={entry.rarity}
+                  data-related-pi-native={entry.piNative}
+                >
                   <img
                     src={publicArtifactUrl(entry.artifactKey)}
                     alt={`${entry.title} pi relic`}
@@ -326,12 +369,31 @@ const jsonLd = relic
           <img alt={`${relic.title} enlarged`} />
         </div>
 
-        <script is:inline define:vars={{ id: relic.id, canonical, prevUrl, nextUrl }}>
+        <script
+          is:inline
+          define:vars={{ id: relic.id, canonical, prevUrl, nextUrl, relicAnalytics }}
+        >
+          function capture(event, properties) {
+            window.posthog?.capture(event, {
+              source: "relic_page",
+              ...relicAnalytics,
+              ...properties
+            });
+          }
+
+          capture("relic_page_viewed");
+
           // keyboard navigation between relics
           document.addEventListener("keydown", (event) => {
             if (event.target instanceof HTMLInputElement) return;
-            if (event.key === "ArrowLeft" && prevUrl) window.location.href = prevUrl;
-            if (event.key === "ArrowRight" && nextUrl) window.location.href = nextUrl;
+            if (event.key === "ArrowLeft" && prevUrl) {
+              capture("relic_keyboard_navigation", { direction: "previous" });
+              window.location.href = prevUrl;
+            }
+            if (event.key === "ArrowRight" && nextUrl) {
+              capture("relic_keyboard_navigation", { direction: "next" });
+              window.location.href = nextUrl;
+            }
           });
 
           // view / relic-card toggle
@@ -348,6 +410,7 @@ const jsonLd = relic
                     other === button
                   )
                 );
+              capture("relic_view_changed", { view });
             });
           });
 
@@ -363,10 +426,14 @@ const jsonLd = relic
               lightboxImg.src = current.getAttribute("src");
               lightbox.hidden = false;
               document.body.style.overflow = "hidden";
+              capture("relic_zoom_opened", { view });
             }
           }
           function closeZoom() {
-            if (lightbox) lightbox.hidden = true;
+            if (lightbox && !lightbox.hidden) {
+              capture("relic_zoom_closed");
+              lightbox.hidden = true;
+            }
             document.body.style.overflow = "";
           }
           document
@@ -383,13 +450,53 @@ const jsonLd = relic
           copyButton?.addEventListener("click", async () => {
             try {
               await navigator.clipboard.writeText(canonical);
+              capture("relic_link_copied", { success: true });
               if (copyLabel) {
                 copyLabel.textContent = "Link copied!";
                 setTimeout(() => (copyLabel.textContent = "Copy link"), 1800);
               }
             } catch {
+              capture("relic_link_copied", { success: false });
               if (copyLabel) copyLabel.textContent = "Copy failed";
             }
+          });
+
+          document
+            .querySelector("[data-download-card]")
+            ?.addEventListener("click", () => {
+              capture("relic_card_downloaded", { source_detail: "relic_page" });
+            });
+
+          document.querySelectorAll("[data-relic-nav]").forEach((link) => {
+            link.addEventListener("click", () => {
+              capture("relic_navigation_clicked", {
+                direction: link.getAttribute("data-relic-nav"),
+                target_relic_id: link.getAttribute("data-target-relic-id")
+              });
+            });
+          });
+
+          document.querySelectorAll("[data-relic-cta]").forEach((link) => {
+            link.addEventListener("click", () => {
+              capture("relic_cta_clicked", {
+                cta: link.getAttribute("data-relic-cta")
+              });
+            });
+          });
+
+          document.querySelectorAll("[data-related-relic-id]").forEach((link) => {
+            link.addEventListener("click", () => {
+              capture("relic_related_clicked", {
+                target_relic_id: link.getAttribute("data-related-relic-id"),
+                related_position: Number(
+                  link.getAttribute("data-related-position") || 0
+                ),
+                target_rarity: link.getAttribute("data-related-rarity"),
+                target_pi_native: Number(
+                  link.getAttribute("data-related-pi-native") || 0
+                )
+              });
+            });
           });
 
           // sampled view counting

@@ -105,6 +105,27 @@ Then deploy:
 npm run deploy
 ```
 
+### PostHog Reverse Proxy
+
+The browser PostHog SDK sends events to `/ingest` on `foundinpi.com`. The
+Cloudflare Worker route at `src/pages/ingest/[...path].ts` forwards SDK assets
+and remote config to `us-assets.i.posthog.com`, then forwards event, flag, and
+recording requests to `us.i.posthog.com`. This keeps analytics requests on a
+first-party domain before Cloudflare forwards them to PostHog. Direct PostHog
+cloud hosts in `PUBLIC_POSTHOG_HOST` are treated as legacy browser config and
+fall back to `/ingest`.
+
+Set the PostHog project token in Cloudflare before deploying:
+
+```sh
+npm exec wrangler secret put PUBLIC_POSTHOG_PROJECT_TOKEN
+npm exec wrangler secret put POSTHOG_PROJECT_TOKEN
+```
+
+Both values can use the same PostHog project token. For EU PostHog projects,
+change `PUBLIC_POSTHOG_UI_HOST`, `POSTHOG_HOST`, and `POSTHOG_ASSET_HOST` in
+`wrangler.jsonc` to the EU hosts before deploying.
+
 For GitHub Actions, set these repository secrets:
 
 - `CLOUDFLARE_API_TOKEN`
