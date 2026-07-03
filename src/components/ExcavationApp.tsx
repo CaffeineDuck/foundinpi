@@ -636,12 +636,22 @@ export default function ExcavationApp() {
 
   useEffect(() => {
     let lastY = window.scrollY;
+    let lowY = lastY;
+    let peakY = lastY;
+    let hidden = false;
     let frame = 0;
     const media = window.matchMedia("(max-width: 620px)");
 
+    const setHeaderHidden = (nextHidden: boolean) => {
+      hidden = nextHidden;
+      setIsMobileHeaderHidden(nextHidden);
+    };
+
     const reset = () => {
       lastY = window.scrollY;
-      if (!media.matches || phase === "intro") setIsMobileHeaderHidden(false);
+      lowY = lastY;
+      peakY = lastY;
+      if (!media.matches || phase === "intro") setHeaderHidden(false);
     };
 
     const handleScroll = () => {
@@ -652,15 +662,33 @@ export default function ExcavationApp() {
         const nextY = Math.max(0, window.scrollY);
 
         if (!media.matches || phase === "intro" || nextY < 72) {
-          setIsMobileHeaderHidden(false);
+          setHeaderHidden(false);
+          lowY = nextY;
+          peakY = nextY;
           lastY = nextY;
           return;
         }
 
         const delta = nextY - lastY;
-        if (Math.abs(delta) < 8) return;
+        if (Math.abs(delta) < 2) {
+          lastY = nextY;
+          return;
+        }
 
-        setIsMobileHeaderHidden(delta > 0);
+        if (hidden) {
+          peakY = Math.max(peakY, nextY);
+          if (peakY - nextY > 64) {
+            setHeaderHidden(false);
+            lowY = nextY;
+          }
+        } else {
+          lowY = Math.min(lowY, nextY);
+          if (nextY - lowY > 14) {
+            setHeaderHidden(true);
+            peakY = nextY;
+          }
+        }
+
         lastY = nextY;
       });
     };
@@ -1406,75 +1434,77 @@ export default function ExcavationApp() {
       ) : (
         <section className="workbench">
           <div className="stage-col">
-            <div
-              className="stage"
-              ref={imageStage}
-              data-state={stageState}
-              style={{
-                aspectRatio: result
-                  ? `${result.width} / ${result.height}`
-                  : "4 / 3"
-              }}
-              onPointerMove={handleStageMove}
-              onPointerLeave={() => setHoverPoint(null)}
-            >
-              {sourceUrl ? (
-                <img src={sourceUrl} alt="" className="source-image" />
-              ) : null}
-              <canvas
-                ref={relicCanvas}
-                className="relic-canvas"
+            <div className="stage-dock">
+              <div
+                className="stage"
+                ref={imageStage}
+                data-state={stageState}
                 style={{
-                  clipPath: `inset(0 ${100 - slider}% 0 0)`,
-                  WebkitClipPath: `inset(0 ${100 - slider}% 0 0)`
+                  aspectRatio: result
+                    ? `${result.width} / ${result.height}`
+                    : "4 / 3"
                 }}
-              />
-              <canvas
-                ref={heatmapCanvas}
-                className={`heatmap-canvas ${heatmapVisible ? "visible" : ""}`}
-              />
-              <div className="stage-fx" aria-hidden="true" />
-              {result && !isWorking ? (
-                <span
-                  className="split-seam"
-                  style={{ left: `${slider}%` }}
-                  aria-hidden="true"
+                onPointerMove={handleStageMove}
+                onPointerLeave={() => setHoverPoint(null)}
+              >
+                {sourceUrl ? (
+                  <img src={sourceUrl} alt="" className="source-image" />
+                ) : null}
+                <canvas
+                  ref={relicCanvas}
+                  className="relic-canvas"
+                  style={{
+                    clipPath: `inset(0 ${100 - slider}% 0 0)`,
+                    WebkitClipPath: `inset(0 ${100 - slider}% 0 0)`
+                  }}
                 />
-              ) : null}
-              {result && !isWorking ? (
-                <div className="stage-badges">
-                  <span>{MODES[mode].label}</span>
-                  {heatmapVisible ? <span className="hot">Heatmap</span> : null}
-                </div>
-              ) : null}
-              {result && !isWorking ? (
-                <button
-                  className="stage-download"
-                  type="button"
-                  title="Download recovered image"
-                  aria-label="Download recovered image"
-                  onPointerEnter={() => setHoverPoint(null)}
-                  onPointerMove={(event) => event.stopPropagation()}
-                  onClick={downloadRelicImage}
-                >
-                  <Download size={18} aria-hidden="true" />
-                </button>
-              ) : null}
-              {isWorking ? (
-                <div className="scan-overlay">
-                  <div className="scan-line" />
-                  <div className="scan-reticle" aria-hidden="true" />
-                  <LoaderCircle size={22} aria-hidden="true" />
-                  <span>{progressLabel}</span>
-                </div>
-              ) : null}
-              {activeTile ? (
-                <div className="tile-popover" data-k={activeTile.className}>
-                  <strong>{TILE_CLASS_LABELS[activeTile.className]}</strong>
-                  <span>offset {activeTile.coordinate}</span>
-                  <small>distance {activeTile.distance}</small>
-                </div>
-              ) : null}
+                <canvas
+                  ref={heatmapCanvas}
+                  className={`heatmap-canvas ${heatmapVisible ? "visible" : ""}`}
+                />
+                <div className="stage-fx" aria-hidden="true" />
+                {result && !isWorking ? (
+                  <span
+                    className="split-seam"
+                    style={{ left: `${slider}%` }}
+                    aria-hidden="true"
+                  />
+                ) : null}
+                {result && !isWorking ? (
+                  <div className="stage-badges">
+                    <span>{MODES[mode].label}</span>
+                    {heatmapVisible ? <span className="hot">Heatmap</span> : null}
+                  </div>
+                ) : null}
+                {result && !isWorking ? (
+                  <button
+                    className="stage-download"
+                    type="button"
+                    title="Download recovered image"
+                    aria-label="Download recovered image"
+                    onPointerEnter={() => setHoverPoint(null)}
+                    onPointerMove={(event) => event.stopPropagation()}
+                    onClick={downloadRelicImage}
+                  >
+                    <Download size={18} aria-hidden="true" />
+                  </button>
+                ) : null}
+                {isWorking ? (
+                  <div className="scan-overlay">
+                    <div className="scan-line" />
+                    <div className="scan-reticle" aria-hidden="true" />
+                    <LoaderCircle size={22} aria-hidden="true" />
+                    <span>{progressLabel}</span>
+                  </div>
+                ) : null}
+                {activeTile ? (
+                  <div className="tile-popover" data-k={activeTile.className}>
+                    <strong>{TILE_CLASS_LABELS[activeTile.className]}</strong>
+                    <span>offset {activeTile.coordinate}</span>
+                    <small>distance {activeTile.distance}</small>
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             <div

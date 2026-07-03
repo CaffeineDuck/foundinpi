@@ -500,6 +500,10 @@ p {
   gap: 10px;
 }
 
+.stage-dock {
+  min-width: 0;
+}
+
 /* the specimen screen */
 .stage {
   position: relative;
@@ -2832,12 +2836,51 @@ p {
     display: contents;
   }
 
-  .stage {
+  .stage-dock {
     position: sticky;
     top: var(--mobile-stage-top);
-    z-index: 35;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-inline: calc(50% - 50vw);
+    padding: 8px 12px 10px;
+    border-block: 1px solid rgb(160 157 144 / 0.62);
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--surface) 96%, white 4%),
+        var(--surface)
+      );
+    box-shadow:
+      0 1px 0 rgb(255 255 255 / 0.72),
+      0 18px 34px rgb(38 34 26 / 0.2),
+      inset 0 1px 0 rgb(255 255 255 / 0.72);
+    isolation: isolate;
+    transition: top 0.22s ease, padding 0.22s ease, box-shadow 0.22s ease;
+  }
+
+  .stage {
+    flex: 0 1 auto;
+    width: min(100%, 366px);
     max-height: min(48svh, 360px);
-    transition: top 0.22s ease;
+    transition: width 0.22s ease, max-height 0.22s ease,
+      box-shadow 0.22s ease;
+  }
+
+  .app[data-mobile-header="hidden"] .stage-dock {
+    padding-top: 6px;
+    padding-bottom: 6px;
+    box-shadow:
+      0 1px 0 rgb(255 255 255 / 0.72),
+      0 16px 28px rgb(38 34 26 / 0.22),
+      0 1px 0 rgb(255 77 0 / 0.18),
+      inset 0 1px 0 rgb(255 255 255 / 0.72);
+  }
+
+  .app[data-mobile-header="hidden"] .stage {
+    width: min(76vw, 300px);
+    max-height: min(31svh, 226px);
   }
 
   .stage-badges {
