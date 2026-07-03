@@ -994,6 +994,140 @@ p {
   cursor: pointer;
 }
 
+/* museum shelf under the workbench */
+.museum-shelf {
+  margin: 22px 0 4px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-strong);
+  animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.museum-shelf-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.museum-shelf-head .eyebrow {
+  margin: 0 0 4px;
+}
+
+.museum-shelf-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 2.4vw, 1.75rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+}
+
+.museum-shelf-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.museum-shelf-actions a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink-dim);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: border-color 0.16s ease, color 0.16s ease, transform 0.12s ease;
+}
+
+.museum-shelf-actions a:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.museum-shelf-actions a:active {
+  transform: translateY(1px);
+}
+
+.museum-strip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.museum-strip-card {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.16s ease, transform 0.16s ease;
+}
+
+.museum-strip-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.museum-strip-card img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: var(--stage-bg);
+}
+
+.museum-strip-card span {
+  display: grid;
+  gap: 4px;
+  padding: 9px 10px 10px;
+}
+
+.museum-strip-card strong,
+.museum-strip-card em,
+.museum-strip-card small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.museum-strip-card strong {
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.museum-strip-card em {
+  color: var(--accent-strong);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.museum-strip-card small {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.61rem;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
 /* ==========================================================================
    Report panel
    ========================================================================== */
@@ -2633,6 +2767,10 @@ p {
     max-height: none;
   }
 
+  .museum-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .artifact-report {
     order: 2;
   }
@@ -2649,6 +2787,30 @@ p {
 
   .app {
     padding-bottom: 90px;
+  }
+
+  .museum-shelf-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .museum-shelf-actions a {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .museum-strip {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .museum-strip-card {
+    min-width: 210px;
+    scroll-snap-align: start;
   }
 
   /* faceplate header stacks so nothing gets clipped on phones */

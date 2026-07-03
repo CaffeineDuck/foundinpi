@@ -70,6 +70,16 @@ type PublishResponse = {
   };
 };
 
+type MuseumShelfRelic = {
+  id: string;
+  title: string;
+  note: string | null;
+  rarity: string;
+  piNative: number;
+  views: number;
+  artifactKey: string;
+};
+
 const MODES_IN_ORDER: ExcavationMode[] = [
   "museum",
   "deep",
@@ -372,6 +382,10 @@ function coordinateParts(coordinate: string) {
   return { prefix: "π", rest: coordinate.replace(/^π[:\s]*/, "") };
 }
 
+function artifactPath(key: string) {
+  return `/artifacts/${key.split("/").map(encodeURIComponent).join("/")}`;
+}
+
 function cleanFieldNote(note: string) {
   return note.trim().replace(/\s+/g, " ").slice(0, FIELD_NOTE_LIMIT);
 }
@@ -430,6 +444,8 @@ export default function ExcavationApp() {
   );
   const [shareMsg, setShareMsg] = useState<string | null>(null);
   const [fieldNote, setFieldNote] = useState("");
+  const [museumRelics, setMuseumRelics] = useState<MuseumShelfRelic[]>([]);
+  const [museumShelfLoaded, setMuseumShelfLoaded] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isDemoSpecimen, setIsDemoSpecimen] = useState(false);
   const shareMsgTimer = useRef<number | null>(null);
@@ -499,6 +515,30 @@ export default function ExcavationApp() {
       result.heatmapBuffer
     );
   }, [result]);
+
+  useEffect(() => {
+    if (phase === "intro" || museumShelfLoaded) return;
+
+    let cancelled = false;
+    setMuseumShelfLoaded(true);
+
+    fetch("/api/relics?limit=6")
+      .then((response) => {
+        if (!response.ok) throw new Error("Unable to load museum shelf");
+        return response.json() as Promise<{ relics?: MuseumShelfRelic[] }>;
+      })
+      .then((body) => {
+        if (cancelled) return;
+        setMuseumRelics((body.relics ?? []).slice(0, 6));
+      })
+      .catch(() => {
+        if (!cancelled) setMuseumRelics([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [museumShelfLoaded, phase]);
 
   function createWorker() {
     const worker = new Worker(
@@ -1541,6 +1581,49 @@ export default function ExcavationApp() {
           </aside>
         </section>
       )}
+
+      {phase !== "intro" && museumRelics.length > 0 ? (
+        <section className="museum-shelf" aria-label="Museum shelf">
+          <div className="museum-shelf-head">
+            <div>
+              <p className="eyebrow">Museum shelf</p>
+              <h2>What else surfaced</h2>
+            </div>
+            <div className="museum-shelf-actions">
+              <a href="/museum">
+                <Eye size={15} aria-hidden="true" />
+                Museum
+              </a>
+              <a href="/random">
+                <Shuffle size={15} aria-hidden="true" />
+                Random
+              </a>
+            </div>
+          </div>
+
+          <div className="museum-strip">
+            {museumRelics.map((relic) => (
+              <a className="museum-strip-card" href={`/r/${relic.id}`} key={relic.id}>
+                <img
+                  src={artifactPath(relic.artifactKey)}
+                  alt={`${relic.title} pi relic`}
+                  loading="lazy"
+                  width="220"
+                  height="150"
+                />
+                <span>
+                  <strong>{relic.title}</strong>
+                  {relic.note ? <em>{relic.note}</em> : null}
+                  <small>
+                    {relic.piNative.toFixed(1)}% pi-native ·{" "}
+                    {relic.views.toLocaleString()} views
+                  </small>
+                </span>
+              </a>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
