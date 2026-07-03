@@ -119,6 +119,7 @@ const jsonLd = {
                 </div>
                 <span class="relic-card-body">
                   <strong>{relic.title}</strong>
+                  {relic.note ? <em>{relic.note}</em> : null}
                   <span class="relic-card-stat">
                     <b>{relic.piNative.toFixed(1)}%</b> pi-native
                   </span>

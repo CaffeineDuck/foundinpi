@@ -605,6 +605,37 @@ p {
   border-color: rgb(255 77 0 / 0.5);
 }
 
+.stage-download {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 7;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: 999px;
+  background: rgb(12 11 8 / 0.42);
+  color: rgb(241 239 230 / 0.84);
+  cursor: pointer;
+  backdrop-filter: blur(5px);
+  transition: background 0.16s ease, border-color 0.16s ease,
+    color 0.16s ease, transform 0.12s ease;
+}
+
+.stage-download:hover,
+.stage-download:focus-visible {
+  border-color: rgb(255 77 0 / 0.62);
+  background: rgb(12 11 8 / 0.72);
+  color: var(--accent);
+}
+
+.stage-download:active {
+  transform: translateY(1px);
+}
+
 .scan-overlay {
   position: absolute;
   inset: 0;
@@ -1302,7 +1333,7 @@ p {
 
 /* excavation map */
 .map-block {
-  margin-bottom: 20px;
+  margin: 18px 0 20px;
 }
 
 .map-caption {
@@ -1354,6 +1385,20 @@ p {
 }
 
 /* share row */
+.publish-panel {
+  display: grid;
+  gap: 10px;
+  margin: -4px 0 20px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface-2) 82%, transparent);
+}
+
+.publish-panel .field-note {
+  margin: 0;
+}
+
 .share {
   display: grid;
   grid-template-columns: 1fr auto auto;
@@ -1438,6 +1483,15 @@ p {
   transform: translateY(0);
 }
 
+.share-privacy {
+  margin: -2px 0 0;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
 .published-link {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -1496,6 +1550,50 @@ p {
 .near-match-link:hover {
   border-color: var(--accent);
   color: var(--accent-strong);
+}
+
+.field-note {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 0;
+  font-family: var(--font-mono);
+}
+
+.field-note span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.field-note small {
+  color: var(--ink-dim);
+  font-size: 0.64rem;
+}
+
+.field-note input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  padding: 11px 12px;
+  color: var(--ink);
+  font: 700 0.78rem/1.3 var(--font-mono);
+  outline: none;
+}
+
+.field-note input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.field-note input:disabled {
+  color: var(--muted);
+  opacity: 0.78;
 }
 
 .error-text {
@@ -1845,6 +1943,19 @@ p {
   color: var(--ink-dim);
   font-family: var(--font-mono);
   font-size: 0.74rem;
+}
+
+.relic-card-body em {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--accent-strong);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .relic-card-stat b {
@@ -2235,7 +2346,7 @@ p {
 }
 
 .artifact-report h1 {
-  margin: 0 0 20px;
+  margin: 0 0 14px;
   font-family: var(--font-display);
   font-weight: 900;
   font-size: clamp(1.9rem, 3.6vw, 2.9rem);
@@ -2243,6 +2354,16 @@ p {
   letter-spacing: -0.015em;
   text-transform: uppercase;
   overflow-wrap: break-word;
+}
+
+.artifact-note {
+  margin: 0 0 18px;
+  color: var(--accent-strong);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .placard {

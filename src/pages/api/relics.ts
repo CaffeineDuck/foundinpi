@@ -25,6 +25,7 @@ function isPublishRelicInput(value: unknown): value is PublishRelicInput {
     typeof input.earthPct === "number" &&
     typeof input.longestFossil === "number" &&
     typeof input.digSite === "string" &&
+    optionalString("note") &&
     optionalString("indexVersion") &&
     optionalString("indexChecksum") &&
     optionalNumber("searchedDigits") &&

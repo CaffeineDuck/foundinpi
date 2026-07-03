@@ -44,6 +44,7 @@ type PublishState =
       status: "published";
       url: string;
       id: string;
+      note: string | null;
       duplicate: boolean;
       nearMatch: PublishMatch | null;
     }
@@ -65,6 +66,7 @@ type PublishResponse = {
   url?: string;
   relic?: {
     id: string;
+    note?: string | null;
   };
 };
 
@@ -77,6 +79,7 @@ const MODES_IN_ORDER: ExcavationMode[] = [
 ];
 
 const DIG_SITE_STORAGE_KEY = "foundinpi:dig-site";
+const FIELD_NOTE_LIMIT = 64;
 
 // Streamed under the viewport before a specimen is loaded.
 const PI_DIGIT_CHUNKS = [
@@ -343,7 +346,8 @@ function drawShareGrid(
 function buildShareText(
   result: ExcavationResult,
   publicUrl: string | null,
-  id: string | null
+  id: string | null,
+  note: string | null
 ) {
   const label = id
     ? `${result.summary.relicName} #${id}`
@@ -355,7 +359,7 @@ ${result.summary.piNative.toFixed(1)}% pi-native
 Longest fossil: ${result.summary.longestFossil} bytes
 Rarity: ${result.summary.rarity}
 ${result.summary.digSite.split(":")[0]}
-${result.summary.shareGrid}
+${note ? `Field note: ${note}\n` : ""}${result.summary.shareGrid}
 ${url}`;
 }
 
@@ -366,6 +370,29 @@ function coordinateParts(coordinate: string) {
   }
 
   return { prefix: "π", rest: coordinate.replace(/^π[:\s]*/, "") };
+}
+
+function cleanFieldNote(note: string) {
+  return note.trim().replace(/\s+/g, " ").slice(0, FIELD_NOTE_LIMIT);
+}
+
+function fieldNoteDraft(note: string) {
+  return note.replace(/[\r\n\t]+/g, " ").slice(0, FIELD_NOTE_LIMIT);
+}
+
+function fitCanvasText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number
+) {
+  if (context.measureText(text).width <= maxWidth) return text;
+
+  let fitted = text;
+  while (fitted.length > 1 && context.measureText(`${fitted}…`).width > maxWidth) {
+    fitted = fitted.slice(0, -1);
+  }
+
+  return `${fitted.trimEnd()}…`;
 }
 
 function tileAt(
@@ -402,6 +429,7 @@ export default function ExcavationApp() {
     null
   );
   const [shareMsg, setShareMsg] = useState<string | null>(null);
+  const [fieldNote, setFieldNote] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isDemoSpecimen, setIsDemoSpecimen] = useState(false);
   const shareMsgTimer = useRef<number | null>(null);
@@ -519,7 +547,7 @@ export default function ExcavationApp() {
   async function excavate(
     file: File,
     nextMode = mode,
-    options?: { demo?: boolean; digSiteId?: DigSiteId }
+    options?: { demo?: boolean; digSiteId?: DigSiteId; resetNote?: boolean }
   ) {
     if (!file.type.startsWith("image/")) {
       setProgressLabel("Choose an image file");
@@ -534,6 +562,7 @@ export default function ExcavationApp() {
     setProgressLabel("Preparing specimen");
     setPublishState({ status: "idle" });
     setShareMsg(null);
+    if (options?.resetNote) setFieldNote("");
     setResult(null);
     setSlider(0);
     lastFileRef.current = file;
@@ -580,12 +609,12 @@ export default function ExcavationApp() {
 
   function handleFileList(files: FileList | null) {
     const file = files?.[0];
-    if (file) void excavate(file, mode, { demo: false, digSiteId });
+    if (file) void excavate(file, mode, { demo: false, digSiteId, resetNote: true });
   }
 
   async function excavateSample() {
     const file = await sampleFile();
-    void excavate(file, mode, { demo: true, digSiteId });
+    void excavate(file, mode, { demo: true, digSiteId, resetNote: true });
   }
 
   function chooseDigSite(nextDigSiteId: DigSiteId) {
@@ -645,7 +674,13 @@ export default function ExcavationApp() {
     setHoverPoint({ x, y });
   }
 
-  async function drawCardCanvas(): Promise<HTMLCanvasElement> {
+  function publishedNoteOverride() {
+    return publishState.status === "published" ? publishState.note : undefined;
+  }
+
+  async function drawCardCanvas(
+    noteOverride?: string | null
+  ): Promise<HTMLCanvasElement> {
     if (!result || !relicCanvas.current) {
       throw new Error("No relic to export");
     }
@@ -754,6 +789,15 @@ export default function ExcavationApp() {
     }
     ctx.fillText(name, rx, 176);
 
+    const note = cleanFieldNote(
+      noteOverride === undefined ? fieldNote : noteOverride ?? ""
+    );
+    if (note) {
+      ctx.fillStyle = inkDim;
+      ctx.font = `600 16px ${display}, sans-serif`;
+      ctx.fillText(fitCanvasText(ctx, `FIELD NOTE · ${note}`, 560), rx, 214);
+    }
+
     ctx.fillStyle = accent;
     ctx.font = `800 94px ${display}, sans-serif`;
     const score = result.summary.piNative.toFixed(1);
@@ -795,8 +839,8 @@ export default function ExcavationApp() {
     return canvas;
   }
 
-  async function renderCardDataUrl() {
-    return (await drawCardCanvas()).toDataURL("image/png");
+  async function renderCardDataUrl(noteOverride?: string | null) {
+    return (await drawCardCanvas(noteOverride)).toDataURL("image/png");
   }
 
   function canvasToBlob(canvas: HTMLCanvasElement) {
@@ -814,10 +858,18 @@ export default function ExcavationApp() {
     shareMsgTimer.current = window.setTimeout(() => setShareMsg(null), 2000);
   }
 
-  async function publish(): Promise<{ url: string; id: string } | null> {
+  async function publish(): Promise<{
+    url: string;
+    id: string;
+    note: string | null;
+  } | null> {
     if (!result || !relicCanvas.current) return null;
     if (publishState.status === "published") {
-      return { url: publishState.url, id: publishState.id };
+      return {
+        url: publishState.url,
+        id: publishState.id,
+        note: publishState.note
+      };
     }
     if (isDemoSpecimen) {
       setPublishState({
@@ -829,13 +881,15 @@ export default function ExcavationApp() {
 
     setPublishState({ status: "publishing" });
     try {
-      const cardImage = await renderCardDataUrl();
+      const note = cleanFieldNote(fieldNote);
+      const cardImage = await renderCardDataUrl(note);
       const relicImage = relicCanvas.current.toDataURL("image/png");
       const response = await fetch("/api/relics", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           title: result.summary.relicName,
+          note,
           demo: isDemoSpecimen,
           mode,
           ...result.summary,
@@ -850,10 +904,13 @@ export default function ExcavationApp() {
       }
       const url = new URL(body.url, window.location.origin).toString();
       const id = body.relic.id;
+      const storedNote = cleanFieldNote(body.relic.note ?? "") || null;
+      setFieldNote(storedNote ?? "");
       setPublishState({
         status: "published",
         url,
         id,
+        note: storedNote,
         duplicate: body.duplicate === true,
         nearMatch: body.nearMatch
           ? {
@@ -862,7 +919,7 @@ export default function ExcavationApp() {
             }
           : null
       });
-      return { url, id };
+      return { url, id, note: storedNote };
     } catch (error) {
       setPublishState({
         status: "error",
@@ -876,12 +933,21 @@ export default function ExcavationApp() {
     if (!result) return;
     const published = await publish();
     if (!published) return; // demo / error is surfaced through publishState
-    const text = buildShareText(result, published.url, published.id);
+    const text = buildShareText(
+      result,
+      published.url,
+      published.id,
+      published.note
+    );
 
     try {
-      const file = new File([await canvasToBlob(await drawCardCanvas())], "found-in-pi.png", {
-        type: "image/png"
-      });
+      const file = new File(
+        [await canvasToBlob(await drawCardCanvas(published.note))],
+        "found-in-pi.png",
+        {
+          type: "image/png"
+        }
+      );
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ title: "Found in Pi", text, files: [file] });
         return;
@@ -899,7 +965,7 @@ export default function ExcavationApp() {
 
   async function downloadCard() {
     try {
-      const url = await renderCardDataUrl();
+      const url = await renderCardDataUrl(publishedNoteOverride());
       const anchor = document.createElement("a");
       anchor.href = url;
       anchor.download = `found-in-pi-${result?.summary.seed ?? "relic"}.png`;
@@ -910,9 +976,21 @@ export default function ExcavationApp() {
     }
   }
 
+  function downloadRelicImage() {
+    if (!result || !relicCanvas.current) return;
+
+    const anchor = document.createElement("a");
+    anchor.href = relicCanvas.current.toDataURL("image/png");
+    anchor.download = `found-in-pi-${result.summary.seed}-relic.png`;
+    anchor.click();
+    flashShare("Relic image downloaded");
+  }
+
   async function copyImage() {
     try {
-      const blob = await canvasToBlob(await drawCardCanvas());
+      const blob = await canvasToBlob(
+        await drawCardCanvas(publishedNoteOverride())
+      );
       if (!window.ClipboardItem || !navigator.clipboard?.write) {
         throw new Error("unsupported");
       }
@@ -1063,6 +1141,19 @@ export default function ExcavationApp() {
                   <span>{MODES[mode].label}</span>
                   {heatmapVisible ? <span className="hot">Heatmap</span> : null}
                 </div>
+              ) : null}
+              {result && !isWorking ? (
+                <button
+                  className="stage-download"
+                  type="button"
+                  title="Download recovered image"
+                  aria-label="Download recovered image"
+                  onPointerEnter={() => setHoverPoint(null)}
+                  onPointerMove={(event) => event.stopPropagation()}
+                  onClick={downloadRelicImage}
+                >
+                  <Download size={18} aria-hidden="true" />
+                </button>
               ) : null}
               {isWorking ? (
                 <div className="scan-overlay">
@@ -1238,6 +1329,125 @@ export default function ExcavationApp() {
                   </div>
                 </div>
 
+                <div className="publish-panel">
+                  <label className="field-note">
+                    <span>
+                      <b>Field note</b>
+                      <small>
+                        {fieldNote.length}/{FIELD_NOTE_LIMIT}
+                      </small>
+                    </span>
+                    <input
+                      type="text"
+                      value={fieldNote}
+                      maxLength={FIELD_NOTE_LIMIT}
+                      disabled={publishState.status === "published"}
+                      placeholder="tiny caption for the museum"
+                      onChange={(event) =>
+                        setFieldNote(fieldNoteDraft(event.currentTarget.value))
+                      }
+                    />
+                  </label>
+
+                  <input
+                    ref={uploadInputRef}
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={(event) => handleFileList(event.currentTarget.files)}
+                  />
+                  <div className="share">
+                    <button
+                      type="button"
+                      className="share-primary"
+                      onClick={() =>
+                        isDemoSpecimen
+                          ? uploadInputRef.current?.click()
+                          : void shareRelic()
+                      }
+                      disabled={publishState.status === "publishing"}
+                    >
+                      {isDemoSpecimen ? (
+                        <ImagePlus size={17} aria-hidden="true" />
+                      ) : (
+                        <Share2 size={17} aria-hidden="true" />
+                      )}
+                      {isDemoSpecimen
+                        ? "Upload to share"
+                        : publishState.status === "publishing"
+                          ? "Publishing…"
+                          : publishState.status === "published"
+                            ? "Share link"
+                            : "Publish & share"}
+                    </button>
+                    <button
+                      type="button"
+                      className="share-opt"
+                      onClick={downloadCard}
+                      title="Download the relic card (PNG)"
+                      aria-label="Download the relic card"
+                    >
+                      <Download size={17} aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      className="share-opt"
+                      onClick={copyImage}
+                      title="Copy the relic card image"
+                      aria-label="Copy the relic card image"
+                    >
+                      <Copy size={17} aria-hidden="true" />
+                    </button>
+                  </div>
+
+                  <p className="share-privacy">
+                    Original image is used for matching only, never stored.
+                  </p>
+
+                  <p className="share-toast" data-show={shareMsg ? "true" : "false"}>
+                    {shareMsg ?? " "}
+                  </p>
+
+                  {publishState.status === "published" ? (
+                    <a
+                      className="published-link"
+                      data-duplicate={publishState.duplicate ? "true" : "false"}
+                      href={publishState.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Link size={13} aria-hidden="true" />
+                      <span>
+                        {publishState.duplicate
+                          ? "Already in the museum — view"
+                          : "Live in the museum — view"}
+                      </span>
+                      <small>{publishState.url}</small>
+                    </a>
+                  ) : null}
+                  {publishState.status === "published" && publishState.nearMatch ? (
+                    <a
+                      className="near-match-link"
+                      href={publishState.nearMatch.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Sparkles size={13} aria-hidden="true" />
+                      Nearest museum match: {publishState.nearMatch.relic.title} ·{" "}
+                      {publishState.nearMatch.similarity.toFixed(1)}%
+                    </a>
+                  ) : null}
+                  {isDemoSpecimen ? (
+                    <p className="demo-note">
+                      Sample specimen — demo only. Upload your own image to publish
+                      &amp; share a link.
+                    </p>
+                  ) : null}
+                  {publishState.status === "error" ? (
+                    <p className="error-text">{publishState.message}</p>
+                  ) : null}
+                </div>
+
                 <div className="breakdown">
                   {BREAKDOWN.map(({ k, label }) => {
                     const pct =
@@ -1303,107 +1513,15 @@ export default function ExcavationApp() {
                           <i
                             key={colIndex}
                             data-k={GLYPH_CLASS[glyph] ?? "earth"}
-                            style={{ animationDelay: `${(rowIndex * 7 + colIndex) * 12}ms` }}
+                            style={{
+                              animationDelay: `${(rowIndex * 7 + colIndex) * 12}ms`
+                            }}
                           />
                         ))}
                       </div>
                     ))}
                   </div>
                 </div>
-
-                <input
-                  ref={uploadInputRef}
-                  type="file"
-                  accept="image/*"
-                  hidden
-                  onChange={(event) => handleFileList(event.currentTarget.files)}
-                />
-                <div className="share">
-                  <button
-                    type="button"
-                    className="share-primary"
-                    onClick={() =>
-                      isDemoSpecimen
-                        ? uploadInputRef.current?.click()
-                        : void shareRelic()
-                    }
-                    disabled={publishState.status === "publishing"}
-                  >
-                    {isDemoSpecimen ? (
-                      <ImagePlus size={17} aria-hidden="true" />
-                    ) : (
-                      <Share2 size={17} aria-hidden="true" />
-                    )}
-                    {isDemoSpecimen
-                      ? "Upload to share"
-                      : publishState.status === "publishing"
-                        ? "Publishing…"
-                        : publishState.status === "published"
-                          ? "Share link"
-                          : "Publish & share"}
-                  </button>
-                  <button
-                    type="button"
-                    className="share-opt"
-                    onClick={downloadCard}
-                    title="Download the relic card (PNG)"
-                    aria-label="Download the relic card"
-                  >
-                    <Download size={17} aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    className="share-opt"
-                    onClick={copyImage}
-                    title="Copy the relic card image"
-                    aria-label="Copy the relic card image"
-                  >
-                    <Copy size={17} aria-hidden="true" />
-                  </button>
-                </div>
-
-                <p className="share-toast" data-show={shareMsg ? "true" : "false"}>
-                  {shareMsg ?? " "}
-                </p>
-
-                {publishState.status === "published" ? (
-                  <a
-                    className="published-link"
-                    data-duplicate={publishState.duplicate ? "true" : "false"}
-                    href={publishState.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Link size={13} aria-hidden="true" />
-                    <span>
-                      {publishState.duplicate
-                        ? "Already in the museum — view"
-                        : "Live in the museum — view"}
-                    </span>
-                    <small>{publishState.url}</small>
-                  </a>
-                ) : null}
-                {publishState.status === "published" && publishState.nearMatch ? (
-                  <a
-                    className="near-match-link"
-                    href={publishState.nearMatch.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Sparkles size={13} aria-hidden="true" />
-                    Nearest museum match: {publishState.nearMatch.relic.title} ·{" "}
-                    {publishState.nearMatch.similarity.toFixed(1)}%
-                  </a>
-                ) : null}
-                {isDemoSpecimen ? (
-                  <p className="demo-note">
-                    Sample specimen — demo only. Upload your own image to publish
-                    &amp; share a link.
-                  </p>
-                ) : null}
-                {publishState.status === "error" ? (
-                  <p className="error-text">{publishState.message}</p>
-                ) : null}
 
                 <details className="dig-note">
                   <summary>

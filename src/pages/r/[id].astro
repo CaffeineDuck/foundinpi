@@ -56,8 +56,9 @@ const canonical = relic
 const title = relic
   ? `${relic.title} - ${relic.rarity} Pi Relic`
   : "Pi Relic Not Found";
+const relicNote = relic?.note?.trim() ?? "";
 const description = relic
-  ? `${relic.piNative.toFixed(1)}% pi-native. Longest fossil: ${relic.longestFossil} bytes. Recovered from ${relic.digSite}.`
+  ? `${relic.piNative.toFixed(1)}% pi-native. Longest fossil: ${relic.longestFossil} bytes. Recovered from ${relic.digSite}.${relicNote ? ` Field note: ${relicNote}` : ""}`
   : "This pi relic could not be found.";
 const artifactUrl = relic
   ? new URL(publicArtifactUrl(relic.artifactKey), Astro.url.origin).toString()
@@ -96,6 +97,7 @@ const jsonLd = relic
       "@type": "ImageObject",
       name: relic.title,
       description,
+      caption: relicNote || undefined,
       contentUrl: artifactUrl,
       thumbnailUrl: cardUrl,
       dateCreated: relic.createdAt,
@@ -218,6 +220,7 @@ const jsonLd = relic
           <article class="artifact-report screws">
             <p class="eyebrow">Recovered Artifact · {catalogNo}</p>
             <h1>{relic.title}</h1>
+            {relicNote ? <p class="artifact-note">“{relicNote}”</p> : null}
 
             <div class="score-hero">
               <div class="score-huge">
@@ -307,6 +310,7 @@ const jsonLd = relic
                   />
                   <span class="relic-card-body">
                     <strong>{entry.title}</strong>
+                    {entry.note ? <em>{entry.note}</em> : null}
                     <span>
                       {entry.piNative.toFixed(1)}% pi-native · {entry.rarity}
                     </span>

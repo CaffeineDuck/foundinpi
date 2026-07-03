@@ -19,6 +19,7 @@ export type EnvLike = {
 type DbRelic = {
   id: string;
   title: string;
+  note?: string | null;
   mode: RelicRecord["mode"];
   rarity: string;
   score: number;
@@ -163,6 +164,7 @@ function dbToRelic(row: DbRelic): RelicRecord {
   return {
     id: row.id,
     title: legacyTitle(row),
+    note: safeNote(row.note),
     mode: row.mode,
     rarity: row.rarity,
     score: row.score,
@@ -217,6 +219,11 @@ function decodeDataUrl(dataUrl: string) {
 function safeTitle(title: string | undefined) {
   const clean = title?.trim().replace(/\s+/g, " ").slice(0, 72);
   return clean || "Untitled Pi Relic";
+}
+
+function safeNote(note: string | undefined | null) {
+  const clean = note?.trim().replace(/\s+/g, " ").slice(0, 64);
+  return clean || null;
 }
 
 function hex(bytes: ArrayBuffer) {
@@ -504,6 +511,7 @@ export async function createRelic(
   const record: RelicRecord = {
     id,
     title: safeTitle(input.title),
+    note: safeNote(input.note),
     mode: input.mode,
     rarity: input.rarity,
     score: input.score,
@@ -558,16 +566,17 @@ export async function createRelic(
   if (env?.DB) {
     await env.DB.prepare(
       `INSERT INTO relics (
-        id, title, mode, rarity, score, pi_native, exact_pct, near_pct,
+        id, title, note, mode, rarity, score, pi_native, exact_pct, near_pct,
         lossy_pct, earth_pct, longest_fossil, dig_site, index_version,
         index_checksum, searched_digits, indexed_fragments, share_grid, summary,
         artifact_key, card_key, artifact_hash, match_hash, status, views,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         record.id,
         record.title,
+        record.note,
         record.mode,
         record.rarity,
         record.score,

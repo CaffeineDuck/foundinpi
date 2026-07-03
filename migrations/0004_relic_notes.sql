@@ -1,0 +1,1 @@
+ALTER TABLE relics ADD COLUMN note TEXT;

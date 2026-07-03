@@ -5,6 +5,7 @@ export type RelicStatus = "public" | "curated" | "hidden";
 export type RelicRecord = {
   id: string;
   title: string;
+  note: string | null;
   mode: ExcavationMode;
   rarity: string;
   score: number;
@@ -43,6 +44,7 @@ export type CreateRelicResult = {
 
 export type PublishRelicInput = {
   title?: string;
+  note?: string;
   demo?: boolean;
   mode: ExcavationMode;
   rarity: string;
