@@ -973,7 +973,7 @@ export default function ExcavationApp() {
 
   function primaryShareLabel() {
     if (isDemoSpecimen) return "Upload to share";
-    if (publishState.status === "publishing") return "Publishing...";
+    if (publishState.status === "publishing") return "Publishing…";
     if (publishState.status === "published") return "Share link";
     return "Publish & share";
   }
@@ -1097,6 +1097,32 @@ export default function ExcavationApp() {
     ctx.fillStyle = accent;
     ctx.fillText(chip, ix + 26, iy + 32);
 
+    // Field stamp — inked onto the specimen photo like a curator's mark.
+    const note = noteOverride === undefined ? stamp : noteOverride;
+    if (note) {
+      const stampText = note.toUpperCase();
+      ctx.save();
+      ctx.font = `700 16px ${mono}, monospace`;
+      const stampW = ctx.measureText(stampText).width + 34;
+      const stampH = 38;
+      ctx.translate(ix + iw - stampW / 2 - 18, iy + ih - stampH / 2 - 16);
+      ctx.rotate(-0.055);
+      ctx.fillStyle = "rgba(10, 9, 6, 0.58)";
+      roundedRect(ctx, -stampW / 2, -stampH / 2, stampW, stampH, 5);
+      ctx.fill();
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 2;
+      roundedRect(ctx, -stampW / 2 + 3.5, -stampH / 2 + 3.5, stampW - 7, stampH - 7, 3);
+      ctx.stroke();
+      ctx.fillStyle = accent;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(stampText, 0, 1);
+      ctx.restore();
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+    }
+
     const rx = 592;
     ctx.fillStyle = ink;
     ctx.font = `800 30px ${display}, sans-serif`;
@@ -1108,15 +1134,6 @@ export default function ExcavationApp() {
       name = `${name.trimEnd()}…`;
     }
     ctx.fillText(name, rx, 176);
-
-    const note = cleanFieldNote(
-      noteOverride === undefined ? fieldNote : noteOverride ?? ""
-    );
-    if (note) {
-      ctx.fillStyle = inkDim;
-      ctx.font = `600 16px ${display}, sans-serif`;
-      ctx.fillText(fitCanvasText(ctx, `FIELD NOTE · ${note}`, 560), rx, 214);
-    }
 
     ctx.fillStyle = accent;
     ctx.font = `800 94px ${display}, sans-serif`;
@@ -1201,7 +1218,7 @@ export default function ExcavationApp() {
 
     setPublishState({ status: "publishing" });
     try {
-      const note = cleanFieldNote(fieldNote);
+      const note = stamp ?? "";
       const cardImage = await renderCardDataUrl(note);
       const relicImage = relicCanvas.current.toDataURL("image/png");
       const sessionId = window.posthog?.get_session_id?.() ?? null;
@@ -1230,8 +1247,8 @@ export default function ExcavationApp() {
       }
       const url = new URL(body.url, window.location.origin).toString();
       const id = body.relic.id;
-      const storedNote = cleanFieldNote(body.relic.note ?? "") || null;
-      setFieldNote(storedNote ?? "");
+      const storedNote = body.relic.note?.trim() || null;
+      setStamp(storedNote);
       setPublishState({
         status: "published",
         url,
@@ -1263,6 +1280,7 @@ export default function ExcavationApp() {
     capturePostHog("relic_shared", {
       source: "excavation_app",
       relic_id: published.id,
+      field_stamp: published.note ?? undefined,
       ...currentAnalytics(resultAnalytics(result)),
     });
 
@@ -1514,6 +1532,30 @@ export default function ExcavationApp() {
                   </div>
                 ) : null}
               </div>
+
+              <div
+                className="dock-rail"
+                role="group"
+                aria-label="Reconstruction style"
+              >
+                {MODES_IN_ORDER.map((entry) => {
+                  const Icon = MODE_ICON[entry];
+                  return (
+                    <button
+                      key={entry}
+                      type="button"
+                      className={entry === mode ? "dock-chip active" : "dock-chip"}
+                      disabled={isWorking}
+                      aria-pressed={entry === mode}
+                      title={MODES[entry].label}
+                      onClick={() => chooseMode(entry)}
+                    >
+                      <Icon size={14} aria-hidden="true" />
+                      {MODES[entry].short}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div
@@ -1592,46 +1634,33 @@ export default function ExcavationApp() {
                 </label>
               </div>
 
-              <details className="mobile-settings">
-                <summary>
-                  <SlidersHorizontal size={16} aria-hidden="true" />
-                  Excavation settings
-                </summary>
-                <div className="mobile-settings-body">
-                  {digSiteSelector("dig-site-seg-tools")}
-                  {styleSelector()}
-                  <div className="mobile-settings-actions">
+              <div className="dig-rail-group">
+                <span className="tool-group-label">
+                  Dig site — which finite π field to search
+                </span>
+                <div
+                  className="dig-rail"
+                  role="group"
+                  aria-label="Which finite pi dig site to search"
+                >
+                  {DIG_SITES.map((site) => (
                     <button
-                      className={heatmapVisible ? "icon-button active" : "icon-button"}
+                      key={site.id}
                       type="button"
-                      disabled={!result}
-                      onClick={() => {
-                        const nextVisible = !heatmapVisible;
-                        setHeatmapVisible(nextVisible);
-                        if (result) {
-                          capturePostHog("excavation_heatmap_toggled", {
-                            source: "excavation_app",
-                            visible: nextVisible,
-                            ...currentAnalytics(resultAnalytics(result))
-                          });
-                        }
-                      }}
+                      className={
+                        site.id === digSiteId ? "dig-pill active" : "dig-pill"
+                      }
+                      disabled={isWorking}
+                      aria-pressed={site.id === digSiteId}
+                      title={`Search ${site.digits.toLocaleString()} ${site.digitUnit}`}
+                      onClick={() => chooseDigSite(site.id)}
                     >
-                      <Grid3X3 size={16} aria-hidden="true" />
-                      Heatmap
+                      <Pickaxe size={13} aria-hidden="true" />
+                      {site.depthLabel}
                     </button>
-                    <label className="icon-button new-image">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(event) => handleFileList(event.currentTarget.files)}
-                      />
-                      <ImagePlus size={16} aria-hidden="true" />
-                      New image
-                    </label>
-                  </div>
+                  ))}
                 </div>
-              </details>
+              </div>
             </div>
           </div>
 
@@ -1694,24 +1723,45 @@ export default function ExcavationApp() {
                 </div>
 
                 <div className="publish-panel">
-                  <label className="field-note">
-                    <span>
-                      <b>Field note</b>
-                      <small>
-                        {fieldNote.length}/{FIELD_NOTE_LIMIT}
-                      </small>
+                  <div className="stamp-picker">
+                    <span className="stamp-label">
+                      <Stamp size={13} aria-hidden="true" />
+                      Field stamp
+                      <small>optional</small>
                     </span>
-                    <input
-                      type="text"
-                      value={fieldNote}
-                      maxLength={FIELD_NOTE_LIMIT}
-                      disabled={publishState.status === "published"}
-                      placeholder="tiny caption for the museum"
-                      onChange={(event) =>
-                        setFieldNote(fieldNoteDraft(event.currentTarget.value))
-                      }
-                    />
-                  </label>
+                    <div
+                      className="stamp-row"
+                      role="group"
+                      aria-label="Pick a field stamp for the museum card"
+                    >
+                      {FIELD_STAMPS.map((entry) => (
+                        <button
+                          key={entry}
+                          type="button"
+                          className={
+                            entry === stamp ? "stamp-chip active" : "stamp-chip"
+                          }
+                          aria-pressed={entry === stamp}
+                          disabled={
+                            publishState.status === "published" ||
+                            publishState.status === "publishing"
+                          }
+                          onClick={() => {
+                            const next = stamp === entry ? null : entry;
+                            setStamp(next);
+                            capturePostHog("field_stamp_toggled", {
+                              source: "excavation_app",
+                              stamp: entry,
+                              selected: next !== null,
+                              ...currentAnalytics(resultAnalytics(result))
+                            });
+                          }}
+                        >
+                          {entry}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
                   <input
                     ref={uploadInputRef}
@@ -1922,6 +1972,42 @@ export default function ExcavationApp() {
           </aside>
         </section>
       )}
+
+      {phase === "relic" ? (
+        <div className="action-dock" role="toolbar" aria-label="Publish and share">
+          <button
+            type="button"
+            className="share-primary"
+            onClick={triggerPrimaryShare}
+            disabled={publishState.status === "publishing"}
+          >
+            {isDemoSpecimen ? (
+              <ImagePlus size={17} aria-hidden="true" />
+            ) : (
+              <Share2 size={17} aria-hidden="true" />
+            )}
+            {primaryShareLabel()}
+          </button>
+          <button
+            type="button"
+            className="share-opt"
+            onClick={downloadCard}
+            title="Download the relic card (PNG)"
+            aria-label="Download the relic card"
+          >
+            <Download size={17} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="share-opt"
+            onClick={copyImage}
+            title="Copy the relic card image"
+            aria-label="Copy the relic card image"
+          >
+            <Copy size={17} aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
 
       {phase !== "intro" && museumRelics.length > 0 ? (
         <section className="museum-shelf" aria-label="Museum shelf">

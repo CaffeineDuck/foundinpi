@@ -119,6 +119,31 @@ export const DIG_SITE_INDEX_URL = DEFAULT_DIG_SITE.indexUrl;
 export const DIG_SITE_INDEX_SHA256 = DEFAULT_DIG_SITE.indexChecksum;
 export const DIG_SITE_LABEL = DEFAULT_DIG_SITE.label;
 
+/**
+ * Curated field stamps — the only captions a relic can carry.
+ * Free text is intentionally not allowed anywhere near the museum.
+ */
+export const FIELD_STAMPS = [
+  "museum grade",
+  "dug by hand",
+  "found at 3am",
+  "do not lick",
+  "handle with awe",
+  "certified crunchy",
+  "straight outta π",
+  "lost media, found",
+  "for science",
+  "older than math"
+] as const;
+
+export type FieldStamp = (typeof FIELD_STAMPS)[number];
+
+export function asFieldStamp(value: string | null | undefined): FieldStamp | null {
+  const clean = value?.trim().replace(/\s+/g, " ").toLowerCase();
+  if (!clean) return null;
+  return FIELD_STAMPS.find((stamp) => stamp === clean) ?? null;
+}
+
 export const TILE_CLASS_LABELS: Record<TileClass, string> = {
   exact: "Exact Pi",
   near: "Near Pi",

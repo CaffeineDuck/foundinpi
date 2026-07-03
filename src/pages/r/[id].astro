@@ -58,7 +58,7 @@ const title = relic
   : "Pi Relic Not Found";
 const relicNote = relic?.note?.trim() ?? "";
 const description = relic
-  ? `${relic.piNative.toFixed(1)}% pi-native. Longest fossil: ${relic.longestFossil} bytes. Recovered from ${relic.digSite}.${relicNote ? ` Field note: ${relicNote}` : ""}`
+  ? `${relic.piNative.toFixed(1)}% pi-native. Longest fossil: ${relic.longestFossil} bytes. Recovered from ${relic.digSite}.${relicNote ? ` Stamped “${relicNote}”.` : ""}`
   : "This pi relic could not be found.";
 const artifactUrl = relic
   ? new URL(publicArtifactUrl(relic.artifactKey), Astro.url.origin).toString()

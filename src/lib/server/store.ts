@@ -6,6 +6,7 @@ import type {
   RelicStatus
 } from "./types";
 import {
+  asFieldStamp,
   DEFAULT_DIG_SITE,
   DIG_SITE_HISTORY,
   DIG_SITES
@@ -221,9 +222,10 @@ function safeTitle(title: string | undefined) {
   return clean || "Untitled Pi Relic";
 }
 
+// Notes only exist as curated field stamps — anything else is dropped,
+// including legacy free-text rows read back from D1.
 function safeNote(note: string | undefined | null) {
-  const clean = note?.trim().replace(/\s+/g, " ").slice(0, 64);
-  return clean || null;
+  return asFieldStamp(note);
 }
 
 function hex(bytes: ArrayBuffer) {
